@@ -1042,6 +1042,5 @@ dkms.conf
 .idea/
 *.cbp
 
-client
 server
 backup
