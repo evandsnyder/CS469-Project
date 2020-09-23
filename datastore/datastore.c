@@ -2,6 +2,8 @@
 #include <argp.h>
 #include <stdlib.h>
 
+#include "../globals.h"
+
 struct Arguments {
     int listenPort;
 };
@@ -25,7 +27,7 @@ static error_t parse_args(int key, char *arg, struct argp_state *state){
 struct argp argp = { options, parse_args, 0, "A program to manage remote database queries."};
 int main(int argc, char *argv[]){
     struct Arguments arguments = {0};
-    arguments.listenPort = 6644;
+    arguments.listenPort = DEFAULT_BACKUP_PORT;
 
     argp_parse(&argp, argc, argv, 0, 0, &arguments);
 

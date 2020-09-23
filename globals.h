@@ -1,12 +1,7 @@
-//
-// Created by Evan on 9/21/2020.
-//
-#include <stdio.h>
-#include <sqlite3.h>
-#include <string.h>
-#include <malloc.h>
-
-# define MAX_ITEMS 128
+#define MAX_ITEMS 128
+#define DEFAULT_SERVER_PORT 4466
+#define DEFAULT_BACKUP_PORT 6644
+#define DEFAULT_SERVER "localhost"
 
 typedef struct {
     int id;
@@ -18,6 +13,10 @@ typedef struct {
     double critChance;
 } Item;
 
+
+// IGNORE THIS STUFF FOR NOW. JUST Leftovers from the SQL Sample. WILL CLEANUP LATER
+
+/*
 static int callback(void *ignore, int argc, char ** argv, char **azColName){
     return 0;
 }
@@ -147,3 +146,4 @@ int main(int argc, char* argv[]){
     sqlite3_close(db);
     return 0;
 }
+*/
