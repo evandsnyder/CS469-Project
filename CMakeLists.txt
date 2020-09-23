@@ -20,8 +20,8 @@ ADD_DEFINITIONS(${GTK3_CFLAGS_OTHER})
 #add_executable(sqlite-demo sqlite-demo.c)
 #target_link_libraries(sqlite-demo ${GTK3_LIBRARIES} ${SQLITE3_LIBRARIES})
 
-add_executable(dbserver dbserver/server.c)
-target_link_libraries(dbserver ${SQLITE3_LIBRARIES})
+add_executable(inventoryserver inventoryserver/server.c)
+target_link_libraries(inventoryserver ${SQLITE3_LIBRARIES})
 
 add_executable(client client/client.c)
 target_link_libraries(client ${GTK3_LIBRARIES})
