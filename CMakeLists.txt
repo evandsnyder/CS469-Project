@@ -21,6 +21,10 @@ ADD_DEFINITIONS(${GTK3_CFLAGS_OTHER})
 #add_executable(dbserver dbserver/server.c)
 #target_link_libraries(dbserver ${SQLITE3_LIBRARIES})
 
+add_executable(inventoryserver inventoryserver/server.c)
+target_link_libraries(inventoryserver ${SQLITE3_LIBRARIES})
+
+
 add_executable(client client/client.c client/login_window.c client/login_window.h client/network.h client/network.c)
 target_link_libraries(client ${GTK3_LIBRARIES} ${GMOD_LIBRARIES})
 target_link_options(client PRIVATE -rdynamic)

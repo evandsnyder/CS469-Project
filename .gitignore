@@ -294,8 +294,8 @@ dist/
 # Flycheck
 flycheck_*.el
 
-# dbserver auth directory
-/dbserver/
+# server auth directory
+/server/
 
 # projectiles files
 .projectile
