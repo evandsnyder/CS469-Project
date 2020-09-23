@@ -17,5 +17,13 @@ LINK_DIRECTORIES(${SQLITE3_LIBRARY_DIRS})
 # Add other flags to the compiler
 ADD_DEFINITIONS(${GTK3_CFLAGS_OTHER})
 
-add_executable(sqlite-demo sqlite-demo.c)
-target_link_libraries(sqlite-demo ${GTK3_LIBRARIES} ${SQLITE3_LIBRARIES})
+#add_executable(sqlite-demo sqlite-demo.c)
+#target_link_libraries(sqlite-demo ${GTK3_LIBRARIES} ${SQLITE3_LIBRARIES})
+
+add_executable(server server/server.c)
+target_link_libraries(server ${SQLITE3_LIBRARIES})
+
+add_executable(client client/client.c)
+target_link_libraries(client ${GTK3_LIBRARIES})
+
+add_executable(datastore datastore/datastore.c)

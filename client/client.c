@@ -2,7 +2,7 @@
 #include <gtk/gtk.h>
 
 int main(int argc, char** argv){
-    printf("Hello, world!\n");
+    printf("Hello from client!\n");
 
     // gtk_init(&argc, &argv);
     return 0;
