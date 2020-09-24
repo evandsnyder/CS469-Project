@@ -3,6 +3,7 @@
 #define DEFAULT_BACKUP_PORT 6644
 #define DEFAULT_SERVER "localhost"
 #define BUFFER_SIZE 256
+#define MAX_CLIENTS 512
 
 typedef struct {
     int id;

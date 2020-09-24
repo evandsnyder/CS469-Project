@@ -44,7 +44,11 @@ G_MODULE_EXPORT void login(GtkWidget *widget, gpointer arg){
     bzero(serverAddress, BUFFER_SIZE);
     sprintf(serverAddress, "AUTH %s %s", usernameBuffer, passwordBuffer);
 
-    SSL_write(ssl, serverAddress, strlen(serverAddress));
+    if(SSL_write(ssl, serverAddress, strlen(serverAddress)) <= 0){
+        fprintf(stderr, "Error writing to server: %s\n", strerror(errno));
+    }
+
+    
 }
 
 void create_login_ui(){

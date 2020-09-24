@@ -1043,3 +1043,5 @@ dkms.conf
 *.cbp
 
 *.db
+server
+backupserver
