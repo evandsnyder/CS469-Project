@@ -4,8 +4,7 @@
 
 #include "login_window.h"
 #include "network.h"
-
-#define BUFFER_SIZE 256
+#include "../globals.h"
 
 GtkWidget *usernameBox;
 GtkWidget *passwordBox;
@@ -23,10 +22,29 @@ G_MODULE_EXPORT void login(GtkWidget *widget, gpointer arg){
     //    close this, open main, pass network socket
     // else
     //    error message
+    unsigned int port = DEFAULT_SERVER_PORT;
 
     printf("Username: %s\n", getUsernameText());
     printf("Password: %s\n", getPasswordText());
     printf("Server address: %s\n", getServerAddressText());
+
+    char* tmp;
+    char remote_host[BUFFER_SIZE];
+
+    tmp = strchr(serverAddress, ':');
+    if(tmp == NULL){
+        strncpy(remote_host, serverAddress, BUFFER_SIZE);
+    } else {
+        strncpy(remote_host, strtok(serverAddress, ':'), BUFFER_SIZE);
+        port = (unsigned int) atoi(tmp+sizeof(char));
+    }
+
+    database_connect(remote_host, port);
+
+    bzero(serverAddress, BUFFER_SIZE);
+    sprintf(serverAddress, "AUTH %s %s", usernameBuffer, passwordBuffer);
+
+    SSL_write(ssl, serverAddress, strlen(serverAddress));
 }
 
 void create_login_ui(){

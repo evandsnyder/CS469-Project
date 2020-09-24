@@ -1041,3 +1041,5 @@ dkms.conf
 
 .idea/
 *.cbp
+
+*.db

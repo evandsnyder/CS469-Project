@@ -3,6 +3,7 @@
 #include <stdlib.h>
 
 #include "../globals.h"
+#include "network.h"
 
 struct Arguments {
     int listenPort;
@@ -10,6 +11,7 @@ struct Arguments {
     int backupPort;
     char *filename;
 };
+
 static struct argp_option options[] = {
         {"listen-port",'l',"<port>", 0, "Port to listen on. Default: 4466"},
         {"backup-inventoryserver", 's', "<inventoryserver>", 0, "Server to backup to. Default: localhost"},
@@ -44,6 +46,7 @@ static error_t parse_args(int key, char *arg, struct argp_state *state){
     return 0;
 }
 
+
 struct argp argp = { options, parse_args, 0, "A program to manage remote database queries."};
 int main(int argc, char *argv[]){
     struct Arguments arguments = {0};
@@ -58,5 +61,49 @@ int main(int argc, char *argv[]){
     printf("\tListen port: %d\n", arguments.listenPort);
     printf("\tServer: %s:%d\n", arguments.server, arguments.backupPort);
     printf("\tConfig file: %s\n", arguments.filename ? arguments.filename: "NULL");
+
+
+    // start listening
+    // handle requests
+
+    SSL_CTX* ssl_ctx;
+    unsigned int sockfd;
+    unsigned int port;
+    char buffer[BUFFER_SIZE];
+
+    init_openssl();
+    ssl_ctx = create_new_context();
+    configure_context(ssl_ctx);
+    sockfd = create_socket(arguments.listenPort);
+    while(true){
+        SSL* ssl;
+        int client;
+        int readfd;
+        int rcount;
+        const char reply[] = "PLACEHOLDER";
+        struct sockaddr_in addr;
+        unsigned int len = sizeof(addr);
+        char client_addr[INET_ADDRSTRLEN];
+
+        client = accept(sockfd, (struct sockaddr*)&addr, &len);
+        if(client < 0){
+            break;
+        }
+
+        inet_ntop(AF_INET, (struct in_addr*)&addr.sin_addr, client_addr, INET_ADDRSTRLEN);
+        fprintf(stdout, "Server: Established TCP connection with client (%s) on port %u\n", client_addr, port);
+
+        ssl = SSL_new(ssl_ctx);
+        SSL_set_fd(ssl, client);
+        if(SSL_accept(ssl) <= 0){
+            fprintf(stderr, "Server: Could not establish a secure connection:\n");
+            ERR_print_errors_fp(stderr);
+        }
+    }
+
+    SSL_CTX_free(ssl_ctx);
+    cleanup_openssl();
+    close(sockfd);
+
     return 0;
 }

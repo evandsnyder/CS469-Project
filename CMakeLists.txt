@@ -21,7 +21,7 @@ ADD_DEFINITIONS(${GTK3_CFLAGS_OTHER})
 #add_executable(dbserver dbserver/server.c)
 #target_link_libraries(dbserver ${SQLITE3_LIBRARIES})
 
-add_executable(inventoryserver inventoryserver/server.c)
+add_executable(inventoryserver inventoryserver/server.c inventoryserver/network.h inventoryserver/network.c)
 target_link_libraries(inventoryserver ${SQLITE3_LIBRARIES})
 
 
