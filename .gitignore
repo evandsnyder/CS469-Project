@@ -1045,3 +1045,4 @@ dkms.conf
 *.db
 server
 backupserver
+clientApp

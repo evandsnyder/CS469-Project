@@ -89,6 +89,7 @@ int main(int argc, char *argv[]){
     SSL_CTX *ssl_ctx;
 
     client_data clients[MAX_CLIENTS];
+    // client_data *clients = (client_data*)malloc(sizeof(client_data)*MAX_CLIENTS);
     pthread_t database_thread;
     struct queue_root *db_queue;
     int err, i;
@@ -149,15 +150,16 @@ int main(int argc, char *argv[]){
             break;
         }
 
+        fprintf(stdout, "New Client: %d\n", client);
+
         // Find first open
         // Spawn new Thread with client here
         for(i =0; i < MAX_CLIENTS && !clients[i].open; ++i);
         if(i == MAX_CLIENTS) continue; // Already at max clients
 
-        client_data *data = (client_data*)malloc(sizeof(client_data));
-        data->socketfd = client;
-        data->queue = db_queue;
-        err = pthread_create(&clients[i].thread_id, NULL, client_thread, &clients[i]);
+        clients[i].socketfd = client;
+        clients[i].queue = db_queue;
+        err = pthread_create(&clients[i].thread_id, NULL, client_thread, (void*)&(clients[i]));
         pthread_detach(clients[i].thread_id);
         break;
     }
@@ -187,8 +189,16 @@ void *handle_database_thread(void *request_queue){
 void *client_thread(void *data){
     char buffer[BUFFER_SIZE];
     client_data *client_info = (client_data*)data;
-    SSL* ssl = SSL_new(client_info->ctx);
-    SSL_set_fd(ssl, client_info->socketfd );
+    SSL_CTX *ctx = client_info->ctx;
+    if(ctx == NULL){
+        fprintf(stderr, "Something is wrong with the CTX");
+    }
+    SSL *ssl = SSL_new(ctx);
+    int socketfd = client_info->socketfd;
+    if(SSL_set_fd(ssl, socketfd) < 0){
+        fprintf(stderr, "Could not bind to secure socket: %s\n", strerror(errno));
+    }
+    fprintf(stdout, "Socket descriptor: %d\n", socketfd);
     if(SSL_accept(ssl) <= 0){
         fprintf(stderr, "Server: Could not establish a secure connection:\n");
         ERR_print_errors_fp(stderr);
@@ -201,7 +211,7 @@ void *client_thread(void *data){
         fprintf(stderr, "Could not read from client: %s\n", strerror(errno));
     }
 
-    fprintf("Message Received: %s\n", buffer);
+    fprintf(stdout, "Message Received: %s\n", buffer);
 
     SSL_free(ssl);
     close(client_info->socketfd);
