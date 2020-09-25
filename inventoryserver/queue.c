@@ -3,10 +3,19 @@
 // https://github.com/majek/dump/blob/master/msqueue/queue_lock_mutex.c
 //
 
+#include <string.h>
 #include <pthread.h>
 #include "queue.h"
 
+
 #define QUEUE_POISON1 ((void*)0xCAFEBAB5)
+
+char *strdup(const char *s){
+    size_t len = strlen(s) + 1;
+    char *r = malloc(len);
+    if(!r) return NULL;
+    return memcpy(r, s, len);
+}
 
 struct queue_root {
     struct queue_head *head;
@@ -31,9 +40,11 @@ struct queue_root *ALLOC_QUEUE_ROOT()
     return root;
 }
 
-void INIT_QUEUE_HEAD(struct queue_head *head)
+void INIT_QUEUE_HEAD(struct queue_head *head, char* operation, struct queue_root *r_queue)
 {
     head->next = QUEUE_POISON1;
+    head->operation = strdup(operation);
+    head->response_queue = r_queue;
 }
 
 void queue_put(struct queue_head *new,

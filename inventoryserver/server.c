@@ -24,10 +24,13 @@ struct Arguments {
     char *filename;
 };
 
-struct thread_data {
+typedef struct {
+    pthread_t thread_id;
     int socketfd;
+    int open;
+    SSL_CTX* ctx;
     struct queue_root* queue;
-};
+} client_data;
 
 static struct argp_option options[] = {
         {"listen-port",'l',"<port>", 0, "Port to listen on. Default: 4466"},
@@ -38,10 +41,17 @@ static struct argp_option options[] = {
         {0}
 };
 
-typedef struct {
-    int sockfd;
-    void* request_queue;
-} client_data;
+static void *malloc_aligned(unsigned int size){
+    void *ptr;
+    int r = posix_memalign(&ptr, 1024, size);
+    if(r != 0){
+        perror("Could not allocated memory in malloc_aligned");
+        return NULL;
+    }
+
+    memset(ptr, 0, size);
+    return ptr;
+}
 
 static error_t parse_args(int key, char *arg, struct argp_state *state){
     struct Arguments *arguments = state->input;
@@ -76,11 +86,12 @@ struct argp argp = { options, parse_args, 0, "A program to manage remote databas
 int main(int argc, char *argv[]){
 
     struct Arguments arguments = {0};
+    SSL_CTX *ssl_ctx;
 
-    pthread_t thread_ids[MAX_CLIENTS];
+    client_data clients[MAX_CLIENTS];
     pthread_t database_thread;
     struct queue_root *db_queue;
-    int err;
+    int err, i;
 
     arguments.listenPort = DEFAULT_SERVER_PORT;
     arguments.server = DEFAULT_SERVER;
@@ -94,10 +105,11 @@ int main(int argc, char *argv[]){
     printf("\tServer: %s:%d\n", arguments.server, arguments.backupPort);
     printf("\tConfig file: %s\n", arguments.filename ? arguments.filename: "NULL");
 
-    init_locks();
-    memset(thread_ids, 0, MAX_CLIENTS);
-
     // Initializing global writer queue
+    db_queue = ALLOC_QUEUE_ROOT();
+    struct queue_head *sample_item = malloc_aligned(sizeof(struct queue_head));
+    INIT_QUEUE_HEAD(sample_item, "INITIALIZATION", NULL);
+    queue_put(sample_item, db_queue);
 
     // Need to spawn Database server
     err = pthread_create(&database_thread, NULL, handle_database_thread, (void *)db_queue);
@@ -105,50 +117,49 @@ int main(int argc, char *argv[]){
         fprintf(stderr, "Server: Could not initialize database thread: %d\n", err);
     }
 
-    // start listening
-    // handle requests
-
-    SSL_CTX* ssl_ctx;
-    unsigned int sockfd;
-    unsigned int port;
-    char buffer[BUFFER_SIZE];
-
+    init_locks();
     init_openssl();
     ssl_ctx = create_new_context();
     configure_context(ssl_ctx);
+
+    // Initialize clients
+    for(i = 0;i < MAX_CLIENTS; i++){
+        clients[i].open = 1;
+        clients[i].ctx = ssl_ctx;
+        clients[i].queue = db_queue;
+    }
+
+    unsigned int sockfd;
+
     sockfd = create_socket(arguments.listenPort);
+    if(sockfd < 0){
+        fprintf(stderr, "Could not create socket\n");
+        exit(-1);
+    }
     fprintf(stdout, "Server: Listening for network connections!\n");
     while(true){
-        SSL* ssl;
         int client;
-        int readfd;
-        int rcount;
-        const char reply[] = "PLACEHOLDER";
         struct sockaddr_in addr;
         unsigned int len = sizeof(addr);
-        char client_addr[INET_ADDRSTRLEN];
+        // char client_addr[INET_ADDRSTRLEN];
 
         client = accept(sockfd, (struct sockaddr*)&addr, &len);
         if(client < 0){
+            fprintf(stderr, "Could not accept client\n");
             break;
         }
 
-        struct thread_data *data;
-        data->socketfd = client;
-        data->queue = db_queue;
         // Find first open
         // Spawn new Thread with client here
-        err = pthread_create(OPEN_SPACE, NULL, client_thread, (void *)data);
+        for(i =0; i < MAX_CLIENTS && !clients[i].open; ++i);
+        if(i == MAX_CLIENTS) continue; // Already at max clients
 
-        inet_ntop(AF_INET, (struct in_addr*)&addr.sin_addr, client_addr, INET_ADDRSTRLEN);
-        fprintf(stdout, "Server: Established TCP connection with client (%s) on port %u\n", client_addr, port);
-
-        ssl = SSL_new(ssl_ctx);
-        SSL_set_fd(ssl, client);
-        if(SSL_accept(ssl) <= 0){
-            fprintf(stderr, "Server: Could not establish a secure connection:\n");
-            ERR_print_errors_fp(stderr);
-        }
+        client_data *data = (client_data*)malloc(sizeof(client_data));
+        data->socketfd = client;
+        data->queue = db_queue;
+        err = pthread_create(&clients[i].thread_id, NULL, client_thread, &clients[i]);
+        pthread_detach(clients[i].thread_id);
+        break;
     }
 
     SSL_CTX_free(ssl_ctx);
@@ -161,11 +172,41 @@ int main(int argc, char *argv[]){
 void *handle_database_thread(void *request_queue){
     struct queue_root *db_queue = (struct queue_root*)request_queue;
 
+    // Read the database every 10ms, operate if actions
+    int flag= 1;
+    while(flag){
+        flag = 0;
+        struct queue_head *msg = queue_get(request_queue);
+        fprintf(stdout, "Message received: %s\n", msg->operation);
+        usleep(10000);
+    }
+
     fprintf(stdout, "Server: Handling Database operations!\n");
 }
 
 void *client_thread(void *data){
-    fprintf(stdout, "Client connected!\n");
+    char buffer[BUFFER_SIZE];
+    client_data *client_info = (client_data*)data;
+    SSL* ssl = SSL_new(client_info->ctx);
+    SSL_set_fd(ssl, client_info->socketfd );
+    if(SSL_accept(ssl) <= 0){
+        fprintf(stderr, "Server: Could not establish a secure connection:\n");
+        ERR_print_errors_fp(stderr);
+    }
+
+    bzero(buffer, BUFFER_SIZE);
+    // Listen for AUTH request
+    int rcount = SSL_read(ssl, buffer, BUFFER_SIZE);
+    if(rcount < 0){
+        fprintf(stderr, "Could not read from client: %s\n", strerror(errno));
+    }
+
+    fprintf("Message Received: %s\n", buffer);
+
+    SSL_free(ssl);
+    close(client_info->socketfd);
+    client_info->open = 1;
+    pthread_exit(NULL);
 }
 
 static void lock_callback(int mode, int type, char *file, int line){

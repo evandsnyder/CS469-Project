@@ -26,7 +26,9 @@ target_link_libraries(server ${SQLITE3_LIBRARIES} ${OPENSSL_LIBRARIES} ${CMAKE_T
 # SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
 
 
-add_executable(clientApp client/client.c client/login_window.c client/login_window.h client/network.h client/network.c)
-target_link_libraries(clientApp ${GTK3_LIBRARIES} ${GMOD_LIBRARIES} "-rdynamic")
+#add_executable(clientApp client/client.c client/login_window.c client/login_window.h client/network.h client/network.c)
+#target_link_libraries(clientApp ${GTK3_LIBRARIES} ${OPENSSL_LIBRARIES} ${GMOD_LIBRARIES} "-rdynamic")
+add_executable(clientApp client/client.c client/network.h client/network.c)
+target_link_libraries(clientApp ${OPENSSL_LIBRARIES})
 
 add_executable(backupserver datastore/datastore.c)
