@@ -118,8 +118,8 @@ int main(int argc, char *argv[]){
         fprintf(stderr, "Server: Could not initialize database thread: %d\n", err);
     }
 
-    init_locks();
     init_openssl();
+    // init_locks();
     ssl_ctx = create_new_context();
     configure_context(ssl_ctx);
 
@@ -161,7 +161,6 @@ int main(int argc, char *argv[]){
         clients[i].queue = db_queue;
         err = pthread_create(&clients[i].thread_id, NULL, client_thread, (void*)&(clients[i]));
         pthread_detach(clients[i].thread_id);
-        break;
     }
 
     SSL_CTX_free(ssl_ctx);
@@ -189,19 +188,23 @@ void *handle_database_thread(void *request_queue){
 void *client_thread(void *data){
     char buffer[BUFFER_SIZE];
     client_data *client_info = (client_data*)data;
-    SSL_CTX *ctx = client_info->ctx;
-    if(ctx == NULL){
-        fprintf(stderr, "Something is wrong with the CTX");
+
+    SSL *ssl = SSL_new(client_info->ctx);
+    if(ssl == NULL){
+        fprintf(stderr, "Error creating new SSL\n");
     }
-    SSL *ssl = SSL_new(ctx);
     int socketfd = client_info->socketfd;
+
     if(SSL_set_fd(ssl, socketfd) < 0){
         fprintf(stderr, "Could not bind to secure socket: %s\n", strerror(errno));
+        pthread_exit(NULL);
     }
+
     fprintf(stdout, "Socket descriptor: %d\n", socketfd);
     if(SSL_accept(ssl) <= 0){
         fprintf(stderr, "Server: Could not establish a secure connection:\n");
         ERR_print_errors_fp(stderr);
+        pthread_exit(NULL);
     }
 
     bzero(buffer, BUFFER_SIZE);
