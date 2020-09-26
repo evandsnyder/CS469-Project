@@ -2,8 +2,10 @@
 #define DEFAULT_SERVER_PORT 4466
 #define DEFAULT_BACKUP_PORT 6644
 #define DEFAULT_SERVER "localhost"
+#define DEFAULT_DATABASE "items.db"
 #define BUFFER_SIZE 256
 #define MAX_CLIENTS 512
+#define SALT_LENGTH 11
 
 typedef struct {
     int id;

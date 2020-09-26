@@ -26,7 +26,8 @@ void DEBUG_network(){
     }
 
     bzero(buffer, BUFFER_SIZE);
-    sprintf(buffer, "AUTH %s %s", "arch1t3ct", "notarealpassword");
+    // sprintf(buffer, "AUTH %s %s", "esnyder", "password");
+    sprintf(buffer, "AUTH %s %s", "esnyder", "notarealpassword");
 
     SSL_write(ssl, buffer, strlen(buffer));
 }

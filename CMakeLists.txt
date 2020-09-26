@@ -22,7 +22,7 @@ ADD_DEFINITIONS(${GTK3_CFLAGS_OTHER})
 
 # add_executable(inventoryserver inventoryserver/server.c inventoryserver/network.c)
 add_executable(server inventoryserver/server.c inventoryserver/network.h inventoryserver/network.c inventoryserver/queue.h inventoryserver/queue.c)
-target_link_libraries(server ${SQLITE3_LIBRARIES} ${OPENSSL_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT})
+target_link_libraries(server ${SQLITE3_LIBRARIES} ${OPENSSL_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} crypt)
 # SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
 
 
@@ -32,3 +32,6 @@ add_executable(clientApp client/client.c client/network.h client/network.c)
 target_link_libraries(clientApp ${OPENSSL_LIBRARIES})
 
 add_executable(backupserver datastore/datastore.c)
+
+add_executable(user_mgr user_mgr.c)
+target_link_libraries(user_mgr ${SQLITE3_LIBRARIES} crypt)
