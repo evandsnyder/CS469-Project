@@ -6,11 +6,11 @@ Evan Snyder
 
 We've chosen prompt 2 for our distributed systems assignment
 
-####TODO:
+#### TODO:
 * ~~Client Login UI~~
 * Client Main UI
 * ~~Client Connect to server~~
-* Server argument parsing
+* ~~Server argument parsing~~
 * ~~Server SSL/TLS Listening~~
 * ~~Server Multithreaded Client Accept~~
 * Server database operations thread
@@ -21,5 +21,6 @@ We've chosen prompt 2 for our distributed systems assignment
   * Periodic backup to datastore server
   * DB Shutdown and closing
  * ~~Server Threadsafe queue~~
+ * ~~Timer Thread~~
  * Datastore SSL/TLS Listen
  * Datastore SSL download and store file
