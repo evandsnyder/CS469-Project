@@ -1,8 +1,11 @@
+#include <string.h>
+
 #define MAX_ITEMS 128
 #define DEFAULT_SERVER_PORT 4466
 #define DEFAULT_BACKUP_PORT 6644
 #define DEFAULT_SERVER "localhost"
 #define DEFAULT_DATABASE "items.db"
+#define DEFAULT_INTERVAL 24*60*60
 #define BUFFER_SIZE 256
 #define MAX_CLIENTS 512
 #define SALT_LENGTH 11
@@ -17,6 +20,17 @@ typedef struct {
     double critChance;
 } Item;
 
+void *malloc_aligned(unsigned int size){
+    void *ptr;
+    int r = posix_memalign(&ptr, 1024, size);
+    if(r != 0){
+        perror("Could not allocated memory in malloc_aligned");
+        return NULL;
+    }
+
+    memset(ptr, 0, size);
+    return ptr;
+}
 
 // IGNORE THIS STUFF FOR NOW. JUST Leftovers from the SQL Sample. WILL CLEANUP LATER
 

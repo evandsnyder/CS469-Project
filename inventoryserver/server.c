@@ -4,6 +4,7 @@
 #include <pthread.h>
 #include <sqlite3.h>
 #include <crypt.h>
+#include <fcntl.h>
 
 #include "../globals.h"
 #include "network.h"
@@ -11,9 +12,12 @@
 
 void *handle_database_thread(void *data);
 void *client_thread(void *data);
+void *timer_thread_handler(void *data);
 int db_login(sqlite3 *db, char *username, char *password);
-void hash_password(char* hash, char* password);
 int authenticate(const char *hash, char *password);
+static error_t parse_args(int key, char *arg, struct argp_state *state);
+int parse_conf_file(void *args);
+int parse_interval(char *interval);
 
 struct Arguments {
     int listenPort;
@@ -21,6 +25,7 @@ struct Arguments {
     int backupPort;
     char *filename;
     char *database;
+    int interval;
 };
 
 typedef struct {
@@ -36,6 +41,11 @@ typedef struct {
     char *database;
 } db_info;
 
+typedef struct {
+    struct queue_root* queue;
+    int interval;
+} timer_info;
+
 static struct argp_option options[] = {
         {"listen-port",'l',"<port>", 0, "Port to listen on. Default: 4466"},
         {"backup-inventoryserver", 's', "<inventoryserver>", 0, "Server to backup to. Default: localhost"},
@@ -46,45 +56,7 @@ static struct argp_option options[] = {
         {0}
 };
 
-static void *malloc_aligned(unsigned int size){
-    void *ptr;
-    int r = posix_memalign(&ptr, 1024, size);
-    if(r != 0){
-        perror("Could not allocated memory in malloc_aligned");
-        return NULL;
-    }
 
-    memset(ptr, 0, size);
-    return ptr;
-}
-
-static error_t parse_args(int key, char *arg, struct argp_state *state){
-    struct Arguments *arguments = state->input;
-    char *pEnd;
-
-
-    switch(key){
-        case 'l':
-            arguments->listenPort = strtol(arg, &pEnd,10);
-            break;
-        case 's':
-            arguments->server = arg;
-            break;
-        case 'p':
-            arguments->backupPort = strtol(arg, &pEnd,10);
-            break;
-        case 'c':
-            arguments->filename = arg;
-            break;
-        case 'd':
-            arguments->database = arg;
-            break;
-        default:
-            return ARGP_ERR_UNKNOWN;
-    }
-
-    return 0;
-}
 
 struct argp argp = { options, parse_args, 0, "A program to manage remote database queries."};
 int main(int argc, char *argv[]){
@@ -93,8 +65,8 @@ int main(int argc, char *argv[]){
     SSL_CTX *ssl_ctx;
 
     client_data clients[MAX_CLIENTS];
-    // client_data *clients = (client_data*)malloc(sizeof(client_data)*MAX_CLIENTS);
     pthread_t database_thread;
+    pthread_t timer_thread;
     struct queue_root *db_queue;
     int err, i;
 
@@ -102,14 +74,18 @@ int main(int argc, char *argv[]){
     arguments.server = DEFAULT_SERVER;
     arguments.backupPort = DEFAULT_BACKUP_PORT;
     arguments.database = DEFAULT_DATABASE;
+    arguments.interval = DEFAULT_INTERVAL;
+    arguments.filename = NULL;
 
     argp_parse(&argp, argc, argv, 0, 0, &arguments);
+    if(arguments.filename != NULL) parse_conf_file(&arguments);
 
     printf("Hello from inventoryserver!\n");
     printf("Provided args:\n");
     printf("\tListen port: %d\n", arguments.listenPort);
     printf("\tServer: %s:%d\n", arguments.server, arguments.backupPort);
     printf("\tConfig file: %s\n", arguments.filename ? arguments.filename: "NULL");
+    printf("\tBackup interval: %d seconds\n", arguments.interval);
 
     // Initializing global writer queue
     db_queue = ALLOC_QUEUE_ROOT();
@@ -125,6 +101,16 @@ int main(int argc, char *argv[]){
     err = pthread_create(&database_thread, NULL, handle_database_thread, (void *)info);
     if(err != 0){
         fprintf(stderr, "Server: Could not initialize database thread: %d\n", err);
+        return -1;
+    }
+
+    timer_info *timer = (timer_info*)malloc(sizeof(timer_info));
+    timer->interval = arguments.interval;
+    timer->queue = db_queue;
+    err = pthread_create(&timer_thread, NULL, timer_thread_handler, (void*)timer);
+    if(err != 0){
+        fprintf(stderr, "Server: Could not initialize timer thread: %d\n", err);
+        return -1;
     }
 
     init_openssl();
@@ -177,6 +163,12 @@ int main(int argc, char *argv[]){
     return 0;
 }
 
+/**
+ * This thread handles all of the database operations. This includes, all standard CRUD operations
+ * as well as the periodic synchronization with the datastore server.
+ * @param data
+ * @return
+ */
 void *handle_database_thread(void *data){
     db_info *info = (db_info*)data;
     struct queue_root *db_queue = info->queue;
@@ -221,16 +213,17 @@ void *handle_database_thread(void *data){
     // Read the database every 10ms, operate if actions
 
     // Operations will be GET, PUT, DEL, and MOD[ify]
-    //
+    // SYNC, AUTH, and TERM are also available.
     int flag= 1;
     while(flag){
         struct queue_head *msg = queue_get(db_queue);
         struct queue_head *response = malloc(sizeof(struct queue_head));
 
         if(msg != NULL){
-            if(msg->response_queue == NULL) continue;
             char username[BUFFER_SIZE];
             char password[BUFFER_SIZE];
+
+
             if(sscanf(msg->operation, "AUTH %s %s", username, password) == 2){
                 fprintf(stdout, "DB_THREAD: Authenticating user\n");
                 retCode = db_login(db, username, password);
@@ -260,16 +253,42 @@ void *handle_database_thread(void *data){
                 flag = 0;
             }
 
-            // Response here
+            if(strcmp(msg->operation, "SYNC") == 0){
+                // TODO: Server backup code Here.
+                // Open connection to remote server
+                // Close database handle.
+                // Open as standard file,
+                // stream it to the server
+                // close file
+                // reopen as database again.
 
-            queue_put(response, msg->response_queue);
+                fprintf(stdout, "Beginning synchronization!\n");
+
+                sqlite3_close(db);
+
+                retCode = sqlite3_open(info->database, &db);
+                if(retCode != SQLITE_OK){
+                    fprintf(stderr, "Error opening database after sync\n");
+                }
+            }
+
+            // Response here
+            if(msg->response_queue != NULL)
+                queue_put(response, msg->response_queue);
         }
 
-        usleep(10000);
+        usleep(10000); // Wait 10 ms between reads
     }
 }
 //}
 
+/**
+ * Each client gets its own thread to recieve network requests from.
+ * Requests are relayed to the database thread through a thread safe queue.
+ *
+ * @param data
+ * @return
+ */
 void *client_thread(void *data){
     char buffer[BUFFER_SIZE];
     client_data *client_info = (client_data*)data;
@@ -321,6 +340,33 @@ void *client_thread(void *data){
     pthread_exit(NULL);
 }
 
+/**
+ * This method is a rudimentary implentation of a backup timer.
+ * It sleeps for a time defined by the user, and then sends a message
+ * to the database thread to conduct the backup operation.
+ *
+ * @param data timer info.
+ * @return NULL
+ */
+void* timer_thread_handler(void *data){
+    fprintf(stdout, "Initializing Backup thread\n");
+    timer_info *info = (timer_info*)data;
+
+    struct queue_head *sync_message = malloc_aligned(sizeof(struct queue_head));
+
+    while(1){
+        sleep(info->interval);
+        free(sync_message);
+        sync_message= malloc_aligned(sizeof(struct queue_head));
+        if(sync_message == NULL){
+            fprintf(stderr, "Could not create synchronization message");
+            exit(-1);
+        }
+        INIT_QUEUE_HEAD(sync_message, "SYNC", NULL);
+        queue_put(sync_message, info->queue);
+    }
+}
+
 int db_login(sqlite3 *db, char *username, char *password) {
     const char *sql = "SELECT password FROM users where username=? LIMIT 1;";
     sqlite3_stmt *stmt;
@@ -341,32 +387,167 @@ int db_login(sqlite3 *db, char *username, char *password) {
     return authenticate(hash, password);
 }
 
-void hash_password(char *hash, char* password){
-    char salt[] = "$5$........";
-    unsigned long int seed[2];
-    const char *const seedchars = "./0123456789"
-                                  "ABCDEFGHIJKLMNOPQRSTUVWXYZ" "abcdefghijklmnopqrstuvwxyz";
-
-    FILE *f = fopen("/dev/random", "r");
-    fread(&seed[0], sizeof(unsigned long int), 2, f);
-    fclose(f);
-
-    for(int i = 0; i < 8; i++){
-        salt[3+i] = seedchars[(seed[i/5] >> (i%5)*6) & 0x3f ];
-    }
-
-    strncpy(hash, crypt(password, salt), BUFFER_SIZE);
-}
-
+/**
+ * Method that takes hash from database and password from user to
+ * Determine if there is a valid login.
+ *
+ * @param hash
+ * @param password
+ * @return
+ */
 int authenticate(const char *hash, char *password){
     char salt[SALT_LENGTH];
     strncpy(salt, hash, SALT_LENGTH);
     salt[11] = '\0';
 
-    fprintf(stdout, "SALT %s\n", salt);
-
-    fprintf(stdout, "Comparing %s to %s\n", password, hash);
-    fprintf(stdout, "with hash: %s\n", crypt(password, salt));
-
     return strncmp(hash, crypt(password, salt), BUFFER_SIZE);
+}
+
+static error_t parse_args(int key, char *arg, struct argp_state *state){
+    struct Arguments *arguments = state->input;
+    char *pEnd;
+    int interval;
+
+
+    switch(key){
+        case 'l':
+            arguments->listenPort = strtol(arg, &pEnd,10);
+            break;
+        case 's':
+            arguments->server = arg;
+            break;
+        case 'p':
+            arguments->backupPort = strtol(arg, &pEnd,10);
+            break;
+        case 'c':
+            arguments->filename = arg;
+            break;
+        case 'd':
+            arguments->database = arg;
+            break;
+        case 'i':
+            interval = parse_interval(arg);
+            if(interval <= 0){
+                fprintf(stderr, "Invalid Timer value %s\n", arg);
+            }
+            arguments->interval = interval;
+            break;
+        default:
+            return ARGP_ERR_UNKNOWN;
+    }
+
+    return 0;
+}
+
+/**
+ * parse_conf_file reads a user defined file to pull program paramters
+ *
+ * @param args arguments struct
+ * @return
+ */
+int parse_conf_file(void *args){
+    struct Arguments *arguments = (struct Arguments *)args;
+    char field[BUFFER_SIZE];
+    char value[BUFFER_SIZE];
+    int val;
+    char *stop;
+
+    FILE *file;
+    file = fopen(arguments->filename, "r");
+    if(file == NULL){
+        fprintf(stderr, "Error opening config file: %s\n", strerror(errno));
+        return -1;
+    }
+
+    while(fscanf(file, "%127[^=]=%127[^\n]%*c", field, value) == 2){
+        stop = NULL;
+        if(strcmp(field, "PORT") == 0){
+            val = strtol(value, &stop, 10);
+            if(stop == NULL || *stop != '\0'){
+                fprintf(stderr, "Error interpreting port: %s\n", value);
+                fclose(file);
+                return -1;
+            }
+            arguments->listenPort = val;
+        }
+
+        if(strcmp(field, "BACKUP_SERVER") == 0){
+            arguments->server = strdup(value);
+        }
+
+        if(strcmp(field, "BACKUP_PORT") == 0){
+            val = strtol(value, &stop, 10);
+            if(stop == NULL || *stop != '\0'){
+                fprintf(stderr, "Error interpreting Backup server port: %s\n", value);
+                fclose(file);
+                return -1;
+            }
+            arguments->backupPort = val;
+        }
+
+        if(strcmp(field, "DATABASE") == 0){
+            arguments->database = strdup(value);
+        }
+
+        if(strcmp(field, "INTERVAL") == 0){
+            val = parse_interval(value);
+            if(val < 0){
+                fprintf(stderr, "Invalid time interval: %s\n", value);
+                fclose(file);
+                return -1;
+            }
+            arguments->interval = val;
+        }
+
+        bzero(field, BUFFER_SIZE);
+        bzero(value, BUFFER_SIZE);
+    }
+
+
+    return 0;
+}
+
+/**
+ * Method to interpret the interval period format
+ * @param interval
+ * @return
+ */
+int parse_interval(char* interval){
+    // Split on the ':'
+    char *stop;
+    char *token;
+    int num;
+    int mult;
+
+    token = strtok(interval, ":");
+    num = strtol(token, &stop, 10);
+    if(stop == NULL){
+        return -1; // Invalid Number
+    }
+    token = strtok(NULL, ":");
+    if(strlen(token) != 1){
+        return -1;
+    }
+    switch(token[0]){
+        // Hours
+        case 'H':
+        case 'h':
+            mult = 60*60;
+            break;
+        // Minutes
+        case 'M':
+        case 'm':
+            mult = 60;
+            break;
+        // Seconds
+        case 'S':
+        case 's':
+            mult = 1;
+            break;
+        default:
+            return -1;
+    }
+
+
+    return num * mult;
 }
