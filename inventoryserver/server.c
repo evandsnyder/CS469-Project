@@ -288,13 +288,24 @@ void *handle_database_thread(void *data){
 
                 char buffer[BUFFER_SIZE];
 
-                // TODO: stream it to the server
-                SSL_write(ssl, "hello world", strlen("hello world"));
+                // stream it to the server
+                // TODO: authentication key?
+                strcpy(buffer, "REPLICATE\n");
+                SSL_write(ssl, buffer, strlen(buffer));
 
-                int rcount = 1;
-                while (rcount > 0) {
-                    rcount = SSL_read(ssl, buffer, BUFFER_SIZE);
+                int rcount;
+                while ((rcount = read(dbFileFd, buffer, BUFFER_SIZE)) > 0) {
+                    rcount = SSL_write(ssl, buffer, rcount);
+                    if (rcount < 0) {
+                        fprintf(stderr, "Error writing to socket\n");
+                        success = 0;
+                    }
                 }
+
+                // TODO: get success response back
+                rcount = 1;
+                while ((rcount = SSL_read(ssl, buffer, BUFFER_SIZE)) > 0)
+                    ;
                 
                 // shut down connection to remote server
                 SSL_shutdown(ssl);

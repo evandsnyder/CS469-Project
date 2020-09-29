@@ -69,12 +69,9 @@ int main(int argc, char *argv[]){
 
         // TODO: accept replication auth, command, and data
         char buffer[BUFFER_SIZE];
-        int rcount = SSL_read(ssl, buffer, BUFFER_SIZE);
-        if (rcount < 0) {
-            fprintf(stderr, "Could not read data\n");
-            ERR_print_errors_fp(stderr);
-            break;
-        }
+        int rcount;
+        while((rcount = SSL_read(ssl, buffer, BUFFER_SIZE)) > 0)
+            ;
 
         // shut it down
         SSL_shutdown(ssl);
