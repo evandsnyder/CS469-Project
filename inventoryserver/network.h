@@ -23,9 +23,11 @@
 static pthread_mutex_t *lockarray;
 
 int create_socket(unsigned int port);
+int create_client_socket(char* hostname, unsigned int port);
 void init_openssl();
 void cleanup_openssl();
 SSL_CTX* create_new_context();
+SSL_CTX* create_new_client_context();
 int configure_context(SSL_CTX* ssl_ctx);
 
 

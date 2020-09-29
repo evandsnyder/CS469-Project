@@ -39,6 +39,8 @@ typedef struct {
 typedef struct {
     struct queue_root* queue;
     char *database;
+    char *backupServer;
+    int backupPort;
 } db_info;
 
 typedef struct {
@@ -96,6 +98,8 @@ int main(int argc, char *argv[]){
     db_info *info = (db_info*)malloc(sizeof(db_info));
     info->database = arguments.database;
     info->queue = db_queue;
+    info->backupServer = arguments.server;
+    info->backupPort = arguments.backupPort;
 
     // Need to spawn Database server
     err = pthread_create(&database_thread, NULL, handle_database_thread, (void *)info);
@@ -254,18 +258,40 @@ void *handle_database_thread(void *data){
             }
 
             if(strcmp(msg->operation, "SYNC") == 0){
-                // TODO: Server backup code Here.
-                // Open connection to remote server
-                // Close database handle.
-                // Open as standard file,
-                // stream it to the server
-                // close file
-                // reopen as database again.
-
                 fprintf(stdout, "Beginning synchronization!\n");
 
+                // Open connection to remote server
+                int backupSockFd = create_client_socket(info->backupServer, info->backupPort);
+                if (backupSockFd < 0) {
+                    fprintf(stderr, "Error reopening database file for sync\n");
+                }
+                SSL_CTX * ssl_ctx = create_new_client_context();
+                SSL * ssl = SSL_new(ssl_ctx);
+                SSL_set_fd(ssl, backupSockFd);
+                if (SSL_connect(ssl) != 1) {
+                    fprintf(stderr, "Could not establish secure connection\n");
+                }
+
+                // Close database handle.
                 sqlite3_close(db);
 
+                // Open as standard file,
+                int dbFileFd = open(info->database, O_RDONLY);
+                if (dbFileFd < 0) {
+                    fprintf(stderr, "Error reopening database file for sync\n");
+                }
+
+                // TODO: stream it to the server
+                
+                // shut down connection to remote server
+                SSL_free(ssl);
+                SSL_CTX_free(ssl_ctx);
+                close(backupSockFd);
+
+                // close file
+                close(dbFileFd);
+
+                // reopen as database again.
                 retCode = sqlite3_open(info->database, &db);
                 if(retCode != SQLITE_OK){
                     fprintf(stderr, "Error opening database after sync\n");
