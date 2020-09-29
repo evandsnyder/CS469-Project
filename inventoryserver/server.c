@@ -301,6 +301,7 @@ void *handle_database_thread(void *data){
                         success = 0;
                     }
                 }
+                SSL_shutdown(ssl);
 
                 // TODO: get success response back
                 rcount = 1;
@@ -308,7 +309,6 @@ void *handle_database_thread(void *data){
                     ;
                 
                 // shut down connection to remote server
-                SSL_shutdown(ssl);
                 SSL_free(ssl);
                 SSL_CTX_free(ssl_ctx);
                 close(backupSockFd);

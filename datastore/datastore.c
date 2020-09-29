@@ -44,12 +44,16 @@ int main(int argc, char *argv[]){
     configure_context(ssl_ctx);
 
     while (1) {
+        // TODO: handle errors better than a break;
+
         // accept the client
         int clientFd = accept(serverFd, NULL, NULL);
         if (clientFd < 0) {
             fprintf(stderr, "Could not create client socket\n");
             break;
         }
+
+        printf("Got client\n");
 
         // start up ssl
         SSL * ssl = SSL_new(ssl_ctx);
@@ -67,16 +71,39 @@ int main(int argc, char *argv[]){
             break;
         }
 
-        // TODO: accept replication auth, command, and data
+        // accept replication command and data
+        // TODO: error handling
+        // TODO: auth
+        const char * command = "REPLICATE\n";
         char buffer[BUFFER_SIZE];
         int rcount;
-        while((rcount = SSL_read(ssl, buffer, BUFFER_SIZE)) > 0)
-            ;
+        rcount = SSL_read(ssl, buffer, BUFFER_SIZE);
+        if (rcount < strlen(command) || strncmp(buffer, command, strlen(command)) != 0) {
+            fprintf(stderr, "Unknown command\n");
+            break;
+        }
 
+        int fileFd = open("items.bk.db", O_WRONLY | O_CREAT, 0666);
+        if (rcount > strlen(command)) {
+            write(fileFd, buffer + strlen(command), rcount - strlen(command));
+        }
+
+        while((rcount = SSL_read(ssl, buffer, BUFFER_SIZE)) > 0) {
+            write(fileFd, buffer, rcount);
+        }
+        close(fileFd);
+
+        printf("copy done\n");
+
+        SSL_write(ssl, "SUCCESS", strlen("SUCCESS"));
+
+        printf("shutting down\n");
         // shut it down
         SSL_shutdown(ssl);
         SSL_free(ssl);
         close(clientFd);
+
+        printf("Client done\n");
     }
 
     return 0;
