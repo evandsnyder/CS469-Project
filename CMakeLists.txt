@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 3.10)
 
 project(CS469_Project)
 
+set(CMAKE_BUILD_TYPE Debug)
+
 FIND_PACKAGE(PkgConfig REQUIRED)
 PKG_CHECK_MODULES(GTK3 REQUIRED gtk+-3.0)
 PKG_CHECK_MODULES(SQLITE3 REQUIRED sqlite3)
@@ -31,7 +33,8 @@ target_link_libraries(server ${SQLITE3_LIBRARIES} ${OPENSSL_LIBRARIES} ${CMAKE_T
 add_executable(clientApp client/client.c client/network.h client/network.c)
 target_link_libraries(clientApp ${OPENSSL_LIBRARIES})
 
-add_executable(backupserver datastore/datastore.c)
+add_executable(backupserver datastore/datastore.c datastore/network.h datastore/network.c)
+target_link_libraries(backupserver ${OPENSSL_LIBRARIES})
 
 add_executable(user_mgr user_mgr.c)
 target_link_libraries(user_mgr ${SQLITE3_LIBRARIES} crypt)

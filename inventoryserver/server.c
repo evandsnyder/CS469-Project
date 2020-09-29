@@ -259,17 +259,21 @@ void *handle_database_thread(void *data){
 
             if(strcmp(msg->operation, "SYNC") == 0){
                 fprintf(stdout, "Beginning synchronization!\n");
+                char success = 1;
 
                 // Open connection to remote server
                 int backupSockFd = create_client_socket(info->backupServer, info->backupPort);
                 if (backupSockFd < 0) {
                     fprintf(stderr, "Error reopening database file for sync\n");
+                    success = 0;
                 }
                 SSL_CTX * ssl_ctx = create_new_client_context();
                 SSL * ssl = SSL_new(ssl_ctx);
                 SSL_set_fd(ssl, backupSockFd);
                 if (SSL_connect(ssl) != 1) {
                     fprintf(stderr, "Could not establish secure connection\n");
+                    ERR_print_errors_fp(stderr);
+                    success = 0;
                 }
 
                 // Close database handle.
@@ -279,11 +283,21 @@ void *handle_database_thread(void *data){
                 int dbFileFd = open(info->database, O_RDONLY);
                 if (dbFileFd < 0) {
                     fprintf(stderr, "Error reopening database file for sync\n");
+                    success = 0;
                 }
 
+                char buffer[BUFFER_SIZE];
+
                 // TODO: stream it to the server
+                SSL_write(ssl, "hello world", strlen("hello world"));
+
+                int rcount = 1;
+                while (rcount > 0) {
+                    rcount = SSL_read(ssl, buffer, BUFFER_SIZE);
+                }
                 
                 // shut down connection to remote server
+                SSL_shutdown(ssl);
                 SSL_free(ssl);
                 SSL_CTX_free(ssl_ctx);
                 close(backupSockFd);
@@ -295,7 +309,13 @@ void *handle_database_thread(void *data){
                 retCode = sqlite3_open(info->database, &db);
                 if(retCode != SQLITE_OK){
                     fprintf(stderr, "Error opening database after sync\n");
+                    success = 0;
                 }
+
+                if(success)
+                    INIT_QUEUE_HEAD(response, "SUCCESS", NULL);
+                else
+                    INIT_QUEUE_HEAD(response, "FAILURE", NULL);
             }
 
             // Response here

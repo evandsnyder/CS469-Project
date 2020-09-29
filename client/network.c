@@ -61,7 +61,7 @@ int database_connect(char* hostname, int port) {
         return -1;
     }
 
-    return ssl;
+    return 1;
 }
 
 int disconnect(){
