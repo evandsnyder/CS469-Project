@@ -23,6 +23,7 @@ struct Arguments {
     int listenPort;
     char *server;
     int backupPort;
+    char *backupPsk;
     char *filename;
     char *database;
     int interval;
@@ -41,6 +42,7 @@ typedef struct {
     char *database;
     char *backupServer;
     int backupPort;
+    char *backupPsk;
 } db_info;
 
 typedef struct {
@@ -51,7 +53,8 @@ typedef struct {
 static struct argp_option options[] = {
         {"listen-port",'l',"<port>", 0, "Port to listen on. Default: 4466"},
         {"backup-inventoryserver", 's', "<inventoryserver>", 0, "Server to backup to. Default: localhost"},
-        {"backup-port", 'p', "<port", 0, "Port of backup inventoryserver. Default: 6644"},
+        {"backup-port", 'p', "<port>", 0, "Port of backup inventoryserver. Default: 6644"},
+        {"backup-key", 'k', "<key>", 0, "Pre-shared key to authenticate to backup server."},
         {"config", 'c', "<filename>", 0, "A config file that can be used in lieu of CLI arguments. This will override all CLI arguments."},
         {"database", 'd', "<filename>", 0, "SQLite 3 database file to use for the application. Default: items.db"},
         {"backup-interval",'i',"<n:H>", 0, "How frequently to backup the database. The time format is time:unit. Acceptable units are [H]ours, [m]inutes, [s]econds. Default: 24:H"},
@@ -75,6 +78,7 @@ int main(int argc, char *argv[]){
     arguments.listenPort = DEFAULT_SERVER_PORT;
     arguments.server = DEFAULT_SERVER;
     arguments.backupPort = DEFAULT_BACKUP_PORT;
+    arguments.backupPsk = "";
     arguments.database = DEFAULT_DATABASE;
     arguments.interval = DEFAULT_INTERVAL;
     arguments.filename = NULL;
@@ -100,6 +104,7 @@ int main(int argc, char *argv[]){
     info->queue = db_queue;
     info->backupServer = arguments.server;
     info->backupPort = arguments.backupPort;
+    info->backupPsk = arguments.backupPsk;
 
     // Need to spawn Database server
     err = pthread_create(&database_thread, NULL, handle_database_thread, (void *)info);
@@ -289,8 +294,7 @@ void *handle_database_thread(void *data){
                 char buffer[BUFFER_SIZE];
 
                 // stream it to the server
-                // TODO: authentication key?
-                strcpy(buffer, "REPLICATE\n");
+                sprintf(buffer, "REPLICATE %s\n", info->backupPsk);
                 SSL_write(ssl, buffer, strlen(buffer));
 
                 int rcount;
@@ -476,6 +480,9 @@ static error_t parse_args(int key, char *arg, struct argp_state *state){
         case 'p':
             arguments->backupPort = strtol(arg, &pEnd,10);
             break;
+        case 'k':
+            arguments->backupPsk = arg;
+            break;
         case 'c':
             arguments->filename = arg;
             break;
@@ -540,6 +547,10 @@ int parse_conf_file(void *args){
                 return -1;
             }
             arguments->backupPort = val;
+        }
+
+        if(strcmp(field, "BACKUP_PSK") == 0){
+            arguments->backupPsk = strdup(value);
         }
 
         if(strcmp(field, "DATABASE") == 0){

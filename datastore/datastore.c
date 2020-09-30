@@ -5,11 +5,15 @@
 #include "../globals.h"
 #include "network.h"
 
+char secure_compare(char * bufa, char * bufb, size_t len);
+
 struct Arguments {
     int listenPort;
+    char *psk;
 };
 static struct argp_option options[] = {
         {"listen-port",'l',"<port>", 0, "Port to listen on. Default: 6644"},
+        {"key",'k',"<key>", 0, "Pre-shared key used to authenticate remote server."},
         {0}
 };
 
@@ -17,11 +21,17 @@ static error_t parse_args(int key, char *arg, struct argp_state *state){
     struct Arguments *arguments = state->input;
     char *pEnd;
 
-    if(key != 'l'){
-        return ARGP_ERR_UNKNOWN;
+    switch(key) {
+        case 'l':
+            arguments->listenPort = strtol(arg, &pEnd,10);
+            break;
+        case 'k':
+            arguments->psk = arg;
+            break;
+        default:
+            return ARGP_ERR_UNKNOWN;
     }
 
-    arguments->listenPort = strtol(arg, &pEnd,10);
     return 0;
 }
 
@@ -29,6 +39,7 @@ struct argp argp = { options, parse_args, 0, "A program to manage remote databas
 int main(int argc, char *argv[]){
     struct Arguments arguments = {0};
     arguments.listenPort = DEFAULT_BACKUP_PORT;
+    arguments.psk = "";
 
     argp_parse(&argp, argc, argv, 0, 0, &arguments);
 
@@ -42,6 +53,9 @@ int main(int argc, char *argv[]){
 
     SSL_CTX * ssl_ctx = create_new_context();
     configure_context(ssl_ctx);
+
+    char * command = malloc(strlen(arguments.psk) + strlen("REPLICATE \n") + 1);
+    sprintf(command, "REPLICATE %s\n", arguments.psk);
 
     while (1) {
         // TODO: handle errors better than a break;
@@ -73,12 +87,10 @@ int main(int argc, char *argv[]){
 
         // accept replication command and data
         // TODO: error handling
-        // TODO: auth
-        const char * command = "REPLICATE\n";
         char buffer[BUFFER_SIZE];
         int rcount;
         rcount = SSL_read(ssl, buffer, BUFFER_SIZE);
-        if (rcount < strlen(command) || strncmp(buffer, command, strlen(command)) != 0) {
+        if (rcount < strlen(command) || !secure_compare(buffer, command, strlen(command))) {
             fprintf(stderr, "Unknown command\n");
             break;
         }
@@ -106,5 +118,15 @@ int main(int argc, char *argv[]){
         printf("Client done\n");
     }
 
+    free(command);
+
     return 0;
+}
+
+char secure_compare(char * bufa, char * bufb, size_t len) {
+    char ret = 1;
+    for(int i=0; i<len; ++i)
+        if (bufa[i] != bufb[i])
+            ret = 0;
+    return ret;
 }
