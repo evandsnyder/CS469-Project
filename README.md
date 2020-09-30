@@ -18,9 +18,10 @@ We've chosen prompt 2 for our distributed systems assignment
   * Read from request queues
   * Do Operation
   * Send reponse back to requesting thread
-  * Periodic backup to datastore server
+  * ~~Periodic backup to datastore server~~
   * DB Shutdown and closing
  * ~~Server Threadsafe queue~~
  * ~~Timer Thread~~
- * Datastore SSL/TLS Listen
- * Datastore SSL download and store file
+ * ~~Datastore SSL/TLS Listen~~
+ * ~~Datastore SSL download and store file~~
+ * Datastore config file
