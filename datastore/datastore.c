@@ -6,6 +6,7 @@
 #include "network.h"
 
 char secure_compare(char * bufa, char * bufb, size_t len);
+void cleanup_connection(SSL * ssl, int clientFd);
 
 struct Arguments {
     int listenPort;
@@ -58,13 +59,12 @@ int main(int argc, char *argv[]){
     sprintf(command, "REPLICATE %s\n", arguments.psk);
 
     while (1) {
-        // TODO: handle errors better than a break;
-
+        // TODO: errno, etc
         // accept the client
         int clientFd = accept(serverFd, NULL, NULL);
         if (clientFd < 0) {
             fprintf(stderr, "Could not create client socket\n");
-            break;
+            continue;
         }
 
         printf("Got client\n");
@@ -73,47 +73,75 @@ int main(int argc, char *argv[]){
         SSL * ssl = SSL_new(ssl_ctx);
         if (!ssl) {
             fprintf(stderr, "Could not create SSL*\n");
-            break;
+            cleanup_connection(NULL, clientFd);
+            continue;
         }
         if (SSL_set_fd(ssl, clientFd) < 0) {
             fprintf(stderr, "Could not set fd\n");
-            break;
+            cleanup_connection(ssl, clientFd);
+            continue;
         }
         if (SSL_accept(ssl) != 1) {
             fprintf(stderr, "Could not establish secure connection\n");
             ERR_print_errors_fp(stderr);
-            break;
+            cleanup_connection(ssl, clientFd);
+            continue;
         }
 
         // accept replication command and data
-        // TODO: error handling
         char buffer[BUFFER_SIZE];
         int rcount;
         rcount = SSL_read(ssl, buffer, BUFFER_SIZE);
         if (rcount < strlen(command) || !secure_compare(buffer, command, strlen(command))) {
             fprintf(stderr, "Unknown command\n");
-            break;
+            cleanup_connection(ssl, clientFd);
+            continue;
         }
 
         int fileFd = open("items.bk.db", O_WRONLY | O_CREAT, 0666);
+        if (fileFd < 0) {
+            fprintf(stderr, "Unable to open output file\n");
+            cleanup_connection(ssl, clientFd);
+            continue;
+        }
+
         if (rcount > strlen(command)) {
-            write(fileFd, buffer + strlen(command), rcount - strlen(command));
+            rcount = write(fileFd, buffer + strlen(command), rcount - strlen(command));
+            if (rcount < 0) {
+                fprintf(stderr, "Unable to write to output file\n");
+                close(fileFd);
+                cleanup_connection(ssl, clientFd);
+                continue;
+            }
         }
 
         while((rcount = SSL_read(ssl, buffer, BUFFER_SIZE)) > 0) {
-            write(fileFd, buffer, rcount);
+            rcount = write(fileFd, buffer, rcount);
+            if (rcount < 0)
+                break;
         }
         close(fileFd);
 
+        if ((SSL_get_shutdown(ssl) & SSL_RECEIVED_SHUTDOWN) == 0) {
+            // we stopped getting data but the server didn't shut things down
+            // must be an error
+            fprintf(stderr, "Unable to write to output file\n");
+            cleanup_connection(ssl, clientFd);
+            continue;
+        }
+
         printf("copy done\n");
 
-        SSL_write(ssl, "SUCCESS", strlen("SUCCESS"));
+        rcount = SSL_write(ssl, "SUCCESS", strlen("SUCCESS"));
+        if (rcount <= 0) {
+            fprintf(stderr, "Unable to send success message\n");
+            cleanup_connection(ssl, clientFd);
+            continue;
+        }
 
         printf("shutting down\n");
-        // shut it down
         SSL_shutdown(ssl);
-        SSL_free(ssl);
-        close(clientFd);
+        cleanup_connection(ssl, clientFd);
 
         printf("Client done\n");
     }
@@ -121,6 +149,12 @@ int main(int argc, char *argv[]){
     free(command);
 
     return 0;
+}
+
+void cleanup_connection(SSL * ssl, int clientFd) {
+    if (ssl)
+        SSL_free(ssl);
+    close(clientFd);
 }
 
 char secure_compare(char * bufa, char * bufb, size_t len) {

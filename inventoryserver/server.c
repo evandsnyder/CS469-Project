@@ -263,62 +263,87 @@ void *handle_database_thread(void *data){
             }
 
             if(strcmp(msg->operation, "SYNC") == 0){
-                fprintf(stdout, "Beginning synchronization!\n");
+                SSL_CTX * ssl_ctx = NULL;
+                SSL * ssl = NULL;
+                int backupSockFd = 0;
+                int dbFileFd = 0;
                 char success = 1;
 
-                // Open connection to remote server
-                int backupSockFd = create_client_socket(info->backupServer, info->backupPort);
-                if (backupSockFd < 0) {
-                    fprintf(stderr, "Error reopening database file for sync\n");
-                    success = 0;
-                }
-                SSL_CTX * ssl_ctx = create_new_client_context();
-                SSL * ssl = SSL_new(ssl_ctx);
-                SSL_set_fd(ssl, backupSockFd);
-                if (SSL_connect(ssl) != 1) {
-                    fprintf(stderr, "Could not establish secure connection\n");
-                    ERR_print_errors_fp(stderr);
-                    success = 0;
-                }
+                fprintf(stdout, "Beginning synchronization!\n");
 
-                // Close database handle.
-                sqlite3_close(db);
+                // NOTE: this doesn't loop. We use it for an early-return on error
+                while (1) {
+                    // TODO: errno, etc
 
-                // Open as standard file,
-                int dbFileFd = open(info->database, O_RDONLY);
-                if (dbFileFd < 0) {
-                    fprintf(stderr, "Error reopening database file for sync\n");
-                    success = 0;
-                }
+                    // Close database handle.
+                    sqlite3_close(db);
 
-                char buffer[BUFFER_SIZE];
+                    ssl_ctx = create_new_client_context();
+                    ssl = SSL_new(ssl_ctx);
 
-                // stream it to the server
-                sprintf(buffer, "REPLICATE %s\n", info->backupPsk);
-                SSL_write(ssl, buffer, strlen(buffer));
-
-                int rcount;
-                while ((rcount = read(dbFileFd, buffer, BUFFER_SIZE)) > 0) {
-                    rcount = SSL_write(ssl, buffer, rcount);
-                    if (rcount < 0) {
-                        fprintf(stderr, "Error writing to socket\n");
+                    // Open connection to remote server
+                    backupSockFd = create_client_socket(info->backupServer, info->backupPort);
+                    if (backupSockFd < 0) {
+                        fprintf(stderr, "Error reopening database file for sync\n");
                         success = 0;
+                        break;
                     }
-                }
-                SSL_shutdown(ssl);
+                    SSL_set_fd(ssl, backupSockFd);
+                    if (SSL_connect(ssl) != 1) {
+                        fprintf(stderr, "Could not establish secure connection\n");
+                        ERR_print_errors_fp(stderr);
+                        success = 0;
+                        break;
+                    }
 
-                // TODO: get success response back
-                rcount = 1;
-                while ((rcount = SSL_read(ssl, buffer, BUFFER_SIZE)) > 0)
-                    ;
+                    // Open as standard file,
+                    dbFileFd = open(info->database, O_RDONLY);
+                    if (dbFileFd < 0) {
+                        fprintf(stderr, "Error reopening database file for sync\n");
+                        success = 0;
+                        break;
+                    }
+
+                    char buffer[BUFFER_SIZE];
+
+                    // stream it to the server
+                    sprintf(buffer, "REPLICATE %s\n", info->backupPsk);
+                    SSL_write(ssl, buffer, strlen(buffer));
+
+                    int rcount;
+                    while ((rcount = read(dbFileFd, buffer, BUFFER_SIZE)) > 0) {
+                        rcount = SSL_write(ssl, buffer, rcount);
+                        if (rcount < 0) {
+                            fprintf(stderr, "Error writing to socket\n");
+                            success = 0;
+                            break;
+                        }
+                    }
+                    if (rcount < 0)
+                        break;
+                    SSL_shutdown(ssl);
+                    // get success response back
+                    rcount = 1;
+                    while ((rcount = SSL_read(ssl, buffer, BUFFER_SIZE)) > 0)
+                        ;
+
+                    if (strncmp(buffer, "SUCCESS", strlen("SUCCESS")) != 0)
+                        success = 0;
+
+                    break;
+                }
                 
                 // shut down connection to remote server
-                SSL_free(ssl);
-                SSL_CTX_free(ssl_ctx);
-                close(backupSockFd);
+                if (ssl)
+                    SSL_free(ssl);
+                if (ssl_ctx)
+                    SSL_CTX_free(ssl_ctx);
+                if(backupSockFd)
+                    close(backupSockFd);
 
                 // close file
-                close(dbFileFd);
+                if(dbFileFd)
+                    close(dbFileFd);
 
                 // reopen as database again.
                 retCode = sqlite3_open(info->database, &db);
