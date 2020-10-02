@@ -18,9 +18,9 @@ int authenticate(const char *hash, char *password);
 static error_t parse_args(int key, char *arg, struct argp_state *state);
 int parse_conf_file(void *args);
 int parse_interval(char *interval);
-Item * new_item_from_row(sqlite3_stmt * stmt);
-char * serialize_item(Item * item);
-Item * deserialize_item(char * buf, size_t buflen);
+void new_item_from_row(sqlite3_stmt * stmt, Item * item);
+void serialize_item(Item * item, char * buff, size_t buflen);
+void deserialize_item(char * buf, size_t buflen, Item * item);
 
 struct Arguments {
     int listenPort;
@@ -254,8 +254,9 @@ void *handle_database_thread(void *data){
                     sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
 
                     int ret;
+                    Item item;
                     while((ret = sqlite3_step(stmt)) == SQLITE_ROW) {
-                        Item * item = new_item_from_row(stmt);
+                        new_item_from_row(stmt, &item);
                         // TODO: do something with the data
                     }
 
@@ -270,8 +271,9 @@ void *handle_database_thread(void *data){
                     sqlite3_bind_int(stmt, 1, id);
 
                     int ret = sqlite3_step(stmt);
+                    Item item;
                     if (ret == SQLITE_ROW) {
-                        Item * item = new_item_from_row(stmt);
+                        new_item_from_row(stmt, &item);
                         // TODO: item found: serialize it into response
                     }
                     else {
@@ -697,10 +699,7 @@ int parse_interval(char* interval){
     return num * mult;
 }
 
-Item * new_item_from_row(sqlite3_stmt * stmt) {
-    //TODO: out param of Item * to avoid malloc?
-    Item * item = malloc(sizeof(Item));
-
+void new_item_from_row(sqlite3_stmt * stmt, Item * item) {
     item->id = sqlite3_column_int(stmt, 1);
     item->name = strdup(sqlite3_column_text(stmt, 2));
     item->description = "";
@@ -711,16 +710,12 @@ Item * new_item_from_row(sqlite3_stmt * stmt) {
     item->damage = sqlite3_column_int(stmt, 7);
     item->critChance = sqlite3_column_double(stmt, 8);
     sqlite3_column_int(stmt, 9); // range
-
-    return item;
 }
 
-char * serialize_item(Item * item) {
+void serialize_item(Item * item, char * buf, size_t buflen) {
     // TODO
-    return NULL;
 }
 
-Item * deserialize_item(char * buf, size_t buflen) {
+void deserialize_item(char * buf, size_t buflen, Item * item) {
     // TODO
-    return NULL;
 }
