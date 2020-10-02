@@ -20,7 +20,7 @@ int parse_conf_file(void *args);
 int parse_interval(char *interval);
 void new_item_from_row(sqlite3_stmt * stmt, Item * item);
 void serialize_item(Item * item, char * buff, size_t buflen);
-void deserialize_item(char * buf, size_t buflen, Item * item);
+void deserialize_item(char * buf, size_t buflen, Item * item, char skip_id);
 
 struct Arguments {
     int listenPort;
@@ -286,10 +286,54 @@ void *handle_database_thread(void *data){
 
             if(sscanf(msg->operation, "PUT %s", request_data) == 1){
                 // Insert new item
+                Item item;
+                deserialize_item(request_data, BUFFER_SIZE, &item, 1);
+
+                const char * sql = "INSERT INTO items (name, armorPoints, healthPoints, damage, critChance) VALUES (?, ?, ?, ?, ?)";
+                sqlite3_stmt * stmt;
+                sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+                sqlite3_bind_text(stmt, 1, item.name, strlen(item.name), NULL);
+                sqlite3_bind_int(stmt, 2, item.armor);
+                sqlite3_bind_int(stmt, 3, item.health);
+                sqlite3_bind_int(stmt, 4, item.damage);
+                sqlite3_bind_double(stmt, 5, item.critChance);
+
+                int ret = sqlite3_step(stmt);
+                if (ret == SQLITE_DONE) {
+                    // TODO: success
+                    // TODO: set item.id
+                }
+                else {
+                    // TODO: failure
+                }
+
+                sqlite3_finalize(stmt);
             }
 
             if(sscanf(msg->operation, "MOD %s", request_data) == 1){
                 // Modify existing item
+                Item item;
+                deserialize_item(request_data, BUFFER_SIZE, &item, 0);
+
+                const char * sql = "UPDATE items SET name=?, armorPoints=?, healthPoints=?, damage=?, critChance=? WHERE id=?";
+                sqlite3_stmt * stmt;
+                sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+                sqlite3_bind_text(stmt, 1, item.name, strlen(item.name), NULL);
+                sqlite3_bind_int(stmt, 2, item.armor);
+                sqlite3_bind_int(stmt, 3, item.health);
+                sqlite3_bind_int(stmt, 4, item.damage);
+                sqlite3_bind_double(stmt, 5, item.critChance);
+                sqlite3_bind_int(stmt, 6, item.id);
+
+                int ret = sqlite3_step(stmt);
+                if (ret == SQLITE_DONE) {
+                    // TODO: success
+                }
+                else {
+                    // TODO: failure
+                }
+
+                sqlite3_finalize(stmt);
             }
 
             if(sscanf(msg->operation, "DEL %s", request_data) == 1){
@@ -723,15 +767,26 @@ void serialize_item(Item * item, char * buf, size_t buflen) {
     );
 }
 
-void deserialize_item(char * buf, size_t buflen, Item * item) {
+void deserialize_item(char * buf, size_t buflen, Item * item, char skip_id) {
     item->name = malloc(sizeof(char) * 256);
 
-    sscanf(buf, "%d\n%s\n%d\n%d\n%d\n%lf",
-        &item->id,
-        item->name,
-        &item->armor,
-        &item->health,
-        &item->damage,
-        &item->critChance
-    );
+    if (skip_id) {
+        sscanf(buf, "%s\n%d\n%d\n%d\n%lf",
+            item->name,
+            &item->armor,
+            &item->health,
+            &item->damage,
+            &item->critChance
+        );
+    }
+    else {
+        sscanf(buf, "%d\n%s\n%d\n%d\n%d\n%lf",
+            &item->id,
+            item->name,
+            &item->armor,
+            &item->health,
+            &item->damage,
+            &item->critChance
+        );
+    }
 }
