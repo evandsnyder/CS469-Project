@@ -713,9 +713,25 @@ void new_item_from_row(sqlite3_stmt * stmt, Item * item) {
 }
 
 void serialize_item(Item * item, char * buf, size_t buflen) {
-    // TODO
+    snprintf(buf, buflen, "%d\n%s\n%d\n%d\n%d\n%lf",
+        item->id,
+        item->name,
+        item->armor,
+        item->health,
+        item->damage,
+        item->critChance
+    );
 }
 
 void deserialize_item(char * buf, size_t buflen, Item * item) {
-    // TODO
+    item->name = malloc(sizeof(char) * 256);
+
+    sscanf(buf, "%d\n%s\n%d\n%d\n%d\n%lf",
+        &item->id,
+        item->name,
+        &item->armor,
+        &item->health,
+        &item->damage,
+        &item->critChance
+    );
 }
