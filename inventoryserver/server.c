@@ -18,6 +18,9 @@ int authenticate(const char *hash, char *password);
 static error_t parse_args(int key, char *arg, struct argp_state *state);
 int parse_conf_file(void *args);
 int parse_interval(char *interval);
+Item * new_item_from_row(sqlite3_stmt * stmt);
+char * serialize_item(Item * item);
+Item * deserialize_item(char * buf, size_t buflen);
 
 struct Arguments {
     int listenPort;
@@ -244,6 +247,39 @@ void *handle_database_thread(void *data){
 
             if(sscanf(msg->operation, "GET %s", request_data) == 1){
                 // GET all items
+                if (strcmp(request_data, "ALL") == 0) {
+                    // TODO: select COUNT(*), malloc array?
+                    const char * sql = "SELECT * FROM items";
+                    sqlite3_stmt * stmt;
+                    sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+
+                    int ret;
+                    while((ret = sqlite3_step(stmt)) == SQLITE_ROW) {
+                        Item * item = new_item_from_row(stmt);
+                        // TODO: do something with the data
+                    }
+
+                    sqlite3_finalize(stmt);
+                }
+                else {
+                    int id = atoi(request_data);
+
+                    const char * sql = "SELECT * FROM items WHERE id=?";
+                    sqlite3_stmt * stmt;
+                    sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+                    sqlite3_bind_int(stmt, 1, id);
+
+                    int ret = sqlite3_step(stmt);
+                    if (ret == SQLITE_ROW) {
+                        Item * item = new_item_from_row(stmt);
+                        // TODO: item found: serialize it into response
+                    }
+                    else {
+                        // TODO: item not found case
+                    }
+
+                    sqlite3_finalize(stmt);
+                }
             }
 
             if(sscanf(msg->operation, "PUT %s", request_data) == 1){
@@ -256,6 +292,22 @@ void *handle_database_thread(void *data){
 
             if(sscanf(msg->operation, "DEL %s", request_data) == 1){
                 // Delete existing
+                int id = atoi(request_data);
+
+                const char * sql = "DELETE FROM items WHERE id=?";
+                sqlite3_stmt * stmt;
+                sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+                sqlite3_bind_int(stmt, 1, id);
+
+                int ret = sqlite3_step(stmt);
+                if (ret == SQLITE_DONE) {
+                    // TODO: success
+                }
+                else {
+                    // TODO: item not found case
+                }
+
+                sqlite3_finalize(stmt);
             }
 
             if(sscanf(msg->operation, "TERM %s", request_data) == 1){
@@ -643,4 +695,32 @@ int parse_interval(char* interval){
 
 
     return num * mult;
+}
+
+Item * new_item_from_row(sqlite3_stmt * stmt) {
+    //TODO: out param of Item * to avoid malloc?
+    Item * item = malloc(sizeof(Item));
+
+    item->id = sqlite3_column_int(stmt, 1);
+    item->name = strdup(sqlite3_column_text(stmt, 2));
+    item->description = "";
+    item->armor = sqlite3_column_int(stmt, 3);
+    item->health = sqlite3_column_int(stmt, 4);
+    sqlite3_column_int(stmt, 5); // mana
+    sqlite3_column_int(stmt, 6); // sell price
+    item->damage = sqlite3_column_int(stmt, 7);
+    item->critChance = sqlite3_column_double(stmt, 8);
+    sqlite3_column_int(stmt, 9); // range
+
+    return item;
+}
+
+char * serialize_item(Item * item) {
+    // TODO
+    return NULL;
+}
+
+Item * deserialize_item(char * buf, size_t buflen) {
+    // TODO
+    return NULL;
 }
