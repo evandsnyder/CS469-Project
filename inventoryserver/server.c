@@ -274,10 +274,14 @@ void *handle_database_thread(void *data){
                     Item item;
                     if (ret == SQLITE_ROW) {
                         new_item_from_row(stmt, &item);
-                        // TODO: item found: serialize it into response
+                        // item found: serialize it into response
+                        sprintf(request_data, "SUCCESS\n");
+                        serialize_item(&item, request_data + strlen(request_data), BUFFER_SIZE - strlen(request_data));
+                        // TODO: memory leak?
+                        INIT_QUEUE_HEAD(response, strdup(request_data), NULL);
                     }
                     else {
-                        // TODO: item not found case
+                        INIT_QUEUE_HEAD(response, "FAILURE", NULL);
                     }
 
                     sqlite3_finalize(stmt);
@@ -518,6 +522,11 @@ void *client_thread(void *data){
 
     fprintf(stdout, "CLIENT_THREAD_%d Message Received: %s\n", socketfd, response->operation);
 
+    if(response->operation) {
+        // TODO: error handling
+        SSL_write(ssl, response->operation, strlen(response->operation));
+    }
+
     SSL_free(ssl);
     close(client_info->socketfd);
     client_info->open = 1;
@@ -744,16 +753,16 @@ int parse_interval(char* interval){
 }
 
 void new_item_from_row(sqlite3_stmt * stmt, Item * item) {
-    item->id = sqlite3_column_int(stmt, 1);
-    item->name = strdup(sqlite3_column_text(stmt, 2));
+    item->id = sqlite3_column_int(stmt, 0);
+    item->name = strdup(sqlite3_column_text(stmt, 1));
     item->description = "";
-    item->armor = sqlite3_column_int(stmt, 3);
-    item->health = sqlite3_column_int(stmt, 4);
-    sqlite3_column_int(stmt, 5); // mana
-    sqlite3_column_int(stmt, 6); // sell price
-    item->damage = sqlite3_column_int(stmt, 7);
-    item->critChance = sqlite3_column_double(stmt, 8);
-    sqlite3_column_int(stmt, 9); // range
+    item->armor = sqlite3_column_int(stmt, 2);
+    item->health = sqlite3_column_int(stmt, 3);
+    sqlite3_column_int(stmt, 4); // mana
+    sqlite3_column_int(stmt, 5); // sell price
+    item->damage = sqlite3_column_int(stmt, 6);
+    item->critChance = sqlite3_column_double(stmt, 7);
+    sqlite3_column_int(stmt, 8); // range
 }
 
 void serialize_item(Item * item, char * buf, size_t buflen) {

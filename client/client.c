@@ -28,7 +28,10 @@ void DEBUG_network(){
     bzero(buffer, BUFFER_SIZE);
     //sprintf(buffer, "AUTH %s %s", "esnyder", "password");
     //sprintf(buffer, "AUTH %s %s", "esnyder", "notarealpassword");
-    sprintf(buffer, "SYNC");
+    //sprintf(buffer, "SYNC");
+    sprintf(buffer, "GET 1");
 
     SSL_write(ssl, buffer, strlen(buffer));
+    SSL_read(ssl, buffer, BUFFER_SIZE);
+    printf("%s", buffer);
 }
