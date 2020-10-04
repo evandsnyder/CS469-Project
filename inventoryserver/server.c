@@ -304,11 +304,14 @@ void *handle_database_thread(void *data){
 
                 int ret = sqlite3_step(stmt);
                 if (ret == SQLITE_DONE) {
-                    // TODO: success
-                    // TODO: set item.id
+                    item.id = sqlite3_last_insert_rowid(db);
+                    // success
+                    sprintf(request_data, "SUCCESS\n%d", item.id);
+                    // TODO: memory leak?
+                    INIT_QUEUE_HEAD(response, strdup(request_data), NULL);
                 }
                 else {
-                    // TODO: failure
+                    INIT_QUEUE_HEAD(response, "FAILURE", NULL);
                 }
 
                 sqlite3_finalize(stmt);
@@ -331,10 +334,12 @@ void *handle_database_thread(void *data){
 
                 int ret = sqlite3_step(stmt);
                 if (ret == SQLITE_DONE) {
-                    // TODO: success
+                    // success
+                    INIT_QUEUE_HEAD(response, "SUCCESS", NULL);
                 }
                 else {
-                    // TODO: failure
+                    // failure
+                    INIT_QUEUE_HEAD(response, "FAILURE", NULL);
                 }
 
                 sqlite3_finalize(stmt);
@@ -351,10 +356,12 @@ void *handle_database_thread(void *data){
 
                 int ret = sqlite3_step(stmt);
                 if (ret == SQLITE_DONE) {
-                    // TODO: success
+                    // success
+                    INIT_QUEUE_HEAD(response, "SUCCESS", NULL);
                 }
                 else {
-                    // TODO: item not found case
+                    // item not found case
+                    INIT_QUEUE_HEAD(response, "FAILURE", NULL);
                 }
 
                 sqlite3_finalize(stmt);
