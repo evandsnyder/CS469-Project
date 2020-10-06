@@ -1,14 +1,20 @@
+#define _GNU_SOURCE
+
 #include <stdio.h>
 #include <argp.h>
 #include <stdlib.h>
 #include <pthread.h>
 #include <sqlite3.h>
-#include <crypt.h>
 #include <fcntl.h>
 
 #include "../globals.h"
 #include "network.h"
 #include "queue.h"
+
+#define CLIENT_GET 1
+#define CLIENT_PUT 2
+#define CLIENT_MOD 3
+#define CLIENT_DEL 4
 
 void *handle_database_thread(void *data);
 void *client_thread(void *data);
@@ -18,6 +24,7 @@ int authenticate(const char *hash, char *password);
 static error_t parse_args(int key, char *arg, struct argp_state *state);
 int parse_conf_file(void *args);
 int parse_interval(char *interval);
+char * marshalItems(sqlite3_stmt *stmt);
 
 struct Arguments {
     int listenPort;
@@ -148,7 +155,7 @@ int main(int argc, char *argv[]){
         unsigned int len = sizeof(addr);
         // char client_addr[INET_ADDRSTRLEN];
 
-        client = accept(sockfd, (struct sockaddr*)&addr, &len);
+        client = accept((int)sockfd, (struct sockaddr*)&addr, &len);
         if(client < 0){
             fprintf(stderr, "Could not accept client\n");
             break;
@@ -183,12 +190,12 @@ void *handle_database_thread(void *data){
     struct queue_root *db_queue = info->queue;
 
     char request_data[BUFFER_SIZE];
+    const char *selectItemsQuery = "SELECT * from items;";
+    const char *insertItemQuery = "INSERT INTO items(name, description, armorPoints, healthPoints, manaPoints, sellPrice, damage, critChance, range) VALUES (?,?,?,?,?,?,?,?,?)";
 
     // Setup Database for operations
     char *valid_schema_query = "SELECT name FROM sqlite_master WHERE type='table' AND name='items' OR name='users'";
     sqlite3 *db = NULL;
-    char *errMsg = 0;
-    char *sql;
     int retCode;
     sqlite3_stmt *stmt = NULL;
 
@@ -242,8 +249,16 @@ void *handle_database_thread(void *data){
                     INIT_QUEUE_HEAD(response, "SUCCESS", NULL);
             }
 
-            if(sscanf(msg->operation, "GET %s", request_data) == 1){
-                // GET all items
+            if(strcmp("GET", msg->operation) == 0){
+                fprintf(stdout, "Database: processing get\n");
+                retCode = sqlite3_prepare_v2(db, selectItemsQuery, -1, &stmt, NULL);
+                if(retCode != SQLITE_OK) {
+                    fprintf(stderr, "SQL Error: %s\n", sqlite3_errmsg(db));
+                    INIT_QUEUE_HEAD(response, "FAILURE", NULL);
+                    continue;
+                }
+                INIT_QUEUE_HEAD(response, marshalItems(stmt), NULL);
+                queue_put(response,msg->response_queue);
             }
 
             if(sscanf(msg->operation, "PUT %s", request_data) == 1){
@@ -265,7 +280,7 @@ void *handle_database_thread(void *data){
             if(strcmp(msg->operation, "SYNC") == 0){
                 SSL_CTX * ssl_ctx = NULL;
                 SSL * ssl = NULL;
-                int backupSockFd = 0;
+                int backupSockFd;
                 int dbFileFd = 0;
                 char success = 1;
 
@@ -361,12 +376,14 @@ void *handle_database_thread(void *data){
             // Response here
             if(msg->response_queue != NULL)
                 queue_put(response, msg->response_queue);
+            // msg needs to be freed and response should be de-referenced
+            free_queue_message(msg);
+            response = NULL;
         }
 
         usleep(10000); // Wait 10 ms between reads
     }
 }
-//}
 
 /**
  * Each client gets its own thread to recieve network requests from.
@@ -378,6 +395,7 @@ void *handle_database_thread(void *data){
 void *client_thread(void *data){
     char buffer[BUFFER_SIZE];
     client_data *client_info = (client_data*)data;
+    int opFlag = 0;
 
     SSL *ssl = SSL_new(client_info->ctx);
     if(ssl == NULL){
@@ -410,6 +428,7 @@ void *client_thread(void *data){
     // But for now, lets just send it to the database thread for some PoC
     INIT_QUEUE_HEAD(query, buffer, msgQueue);
     queue_put(query, client_info->queue);
+    query = NULL; // Remove reference to it
 
     // Check the response queue until a response is received;
     struct queue_head *response = malloc_aligned(sizeof(struct queue_head));
@@ -419,6 +438,65 @@ void *client_thread(void *data){
     }while(response == NULL);
 
     fprintf(stdout, "CLIENT_THREAD_%d Message Received: %s\n", socketfd, response->operation);
+
+    bzero(buffer, BUFFER_SIZE);
+    strncpy(buffer, response->operation, BUFFER_SIZE);
+    int validLogin = 1;
+    if(strcmp("FAILURE", response->operation) == 0){
+        validLogin = 0;
+    }
+    SSL_write(ssl, buffer, (int)strlen(buffer));
+
+    while(validLogin){
+
+        bzero(buffer, BUFFER_SIZE);
+        if(SSL_read(ssl, buffer, BUFFER_SIZE) < 0) {
+            fprintf(stderr, "Error reading from client: %s\n", strerror(errno));
+            validLogin = 0;
+            continue;
+        }
+        if(strlen(buffer) == 0){
+            continue;
+        }
+
+        fprintf(stdout, "Message received: %s\n", buffer);
+
+        query = (struct queue_head*)malloc(sizeof(struct queue_head));
+        INIT_QUEUE_HEAD(query, buffer, msgQueue);
+        // fprintf(stdout, "%s\n", query->operation);
+        queue_put(query, client_info->queue);
+
+        if(strncmp("GET", buffer, strlen(buffer)) == 0){
+            opFlag = CLIENT_GET;
+        }
+
+        response = NULL;
+        do{
+            response = queue_get(msgQueue);
+            usleep(10000);
+        } while( response == NULL);
+
+        switch(opFlag){
+            case CLIENT_GET:
+                if((rcount = SSL_write(ssl, response->operation, (int)strlen(response->operation))) < 0){
+                    fprintf(stderr, "Error writing to client: %s\n", strerror(errno));
+                    validLogin = 0;
+                    continue;
+                }
+                fprintf(stdout,"wrote %d, bytes\n", rcount);
+
+                break;
+            case CLIENT_PUT:
+            case CLIENT_MOD:
+            case CLIENT_DEL:
+            default:
+                fprintf(stderr, "No supported yet\n");
+                break;
+        }
+
+        // Free the response and get ready for the next one
+        free_queue_message(response);
+    }
 
     SSL_free(ssl);
     close(client_info->socketfd);
@@ -466,11 +544,14 @@ int db_login(sqlite3 *db, char *username, char *password) {
         return -1;
     }
 
-    const char *hash = sqlite3_column_text(stmt, 0);
+    char *hash = malloc(sizeof(char)*BUFFER_SIZE);
+    strncpy(hash, (char*)sqlite3_column_text(stmt, 0), BUFFER_SIZE);
     sqlite3_finalize(stmt);
+    int r = authenticate(hash, password);
 
-    fprintf(stdout, "HASH: %s\n", hash);
-    return authenticate(hash, password);
+    free(hash);
+
+    return r;
 }
 
 /**
@@ -497,13 +578,13 @@ static error_t parse_args(int key, char *arg, struct argp_state *state){
 
     switch(key){
         case 'l':
-            arguments->listenPort = strtol(arg, &pEnd,10);
+            arguments->listenPort = (int)strtol(arg, &pEnd,10);
             break;
         case 's':
             arguments->server = arg;
             break;
         case 'p':
-            arguments->backupPort = strtol(arg, &pEnd,10);
+            arguments->backupPort = (int)strtol(arg, &pEnd,10);
             break;
         case 'k':
             arguments->backupPsk = arg;
@@ -643,4 +724,56 @@ int parse_interval(char* interval){
 
 
     return num * mult;
+}
+
+
+char * marshalItems(sqlite3_stmt *stmt){
+    size_t cur_size =1024*4;
+    size_t mem_size = 1024*4;
+    char* result = (char*)malloc(sizeof(char)*mem_size); // Allocate 4Kb
+    bzero(result, sizeof(char)*mem_size);
+    strncat(result, "DATA ", 5);
+
+    int r = SQLITE_OK;
+    r = sqlite3_step(stmt);
+    while(r == SQLITE_ROW ){
+        char* curItem;
+        asprintf(&curItem, "%d%c%s%c%d%c%d%c%d%c%d%c%d%c%f%c%d%c%s%c",
+                 sqlite3_column_int(stmt, 0), // id
+                 UNIT_SEPARATOR,
+                 (const char*)sqlite3_column_text(stmt, 1), // name
+                 UNIT_SEPARATOR,
+                 sqlite3_column_int(stmt, 2), // armor
+                 UNIT_SEPARATOR,
+                 sqlite3_column_int(stmt, 3), // health
+                 UNIT_SEPARATOR,
+                 sqlite3_column_int(stmt, 4), // mana
+                 UNIT_SEPARATOR,
+                 sqlite3_column_int(stmt, 5), // sellPrice
+                 UNIT_SEPARATOR,
+                 sqlite3_column_int(stmt, 6), // damage
+                 UNIT_SEPARATOR,
+                 sqlite3_column_double(stmt, 7), // critical
+                 UNIT_SEPARATOR,
+                 sqlite3_column_int(stmt, 8), //range
+                 UNIT_SEPARATOR,
+                 (const char*)sqlite3_column_text(stmt, 9),
+                 RECORD_SEPARATOR
+         );
+
+        // Need to append
+        if(strlen(curItem) + strlen(result) >= cur_size){ // Amount of data is too large, we need to add more memory
+            cur_size += mem_size;
+            result = realloc(result, cur_size);
+        }
+        strncat(result, curItem, strlen(curItem));
+        free(curItem);
+        r = sqlite3_step(stmt);
+    }
+
+    // Replace last character with group separator
+    // -1 should be \x0, -2 should be RECORD_SEPARATOR
+    result[strlen(result)-2] = GROUP_SEPARATOR;
+
+    return result;
 }

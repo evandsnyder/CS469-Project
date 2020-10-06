@@ -5,7 +5,6 @@
   <object class="GtkWindow" id="loginWindow">
     <property name="can_focus">False</property>
     <property name="title" translatable="yes">Login</property>
-    <signal name="destroy" handler="gtk_main_quit" swapped="no"/>
     <child>
       <object class="GtkBox">
         <property name="visible">True</property>
@@ -90,6 +89,7 @@
                     <property name="visibility">False</property>
                     <property name="invisible_char">*</property>
                     <property name="input_purpose">password</property>
+                    <signal name="activate" handler="login" swapped="no"/>
                   </object>
                   <packing>
                     <property name="expand">False</property>

@@ -17,7 +17,8 @@ create_items_table = """CREATE TABLE IF NOT EXISTS items(
     sellPrice integer NOT NULL,
     damage integer NOT NULL,
     critChance real NOT NULL,
-    range integer NOT NULL
+    range integer NOT NULL,
+    description text NOT NULL
 );"""
 
 c = conn.cursor()
@@ -27,7 +28,7 @@ c.execute(create_users_table)
 c.execute("DROP TABLE IF EXISTS items;")
 c.execute(create_items_table)
 
-sql = "INSERT INTO items(name, armorPoints, healthPoints, manaPoints, sellPrice, damage, critChance, range) VALUES (?,?,?,?,?,?,?,?)"
+sql = "INSERT INTO items(name, armorPoints, healthPoints, manaPoints, sellPrice, damage, critChance, range, description) VALUES (?,?,?,?,?,?,?,?,'DESCRIPTION');"
 
 with open('items.csv') as f:
     for line in f:

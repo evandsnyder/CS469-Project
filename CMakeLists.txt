@@ -23,17 +23,18 @@ LINK_DIRECTORIES(${SQLITE3_LIBRARY_DIRS})
 ADD_DEFINITIONS(${GTK3_CFLAGS_OTHER})
 
 # add_executable(inventoryserver inventoryserver/server.c inventoryserver/network.c)
-add_executable(server inventoryserver/server.c inventoryserver/network.h inventoryserver/network.c inventoryserver/queue.h inventoryserver/queue.c)
+add_executable(server inventoryserver/server.c inventoryserver/network.h inventoryserver/network.c inventoryserver/queue.h inventoryserver/queue.c globals.c)
 target_link_libraries(server ${SQLITE3_LIBRARIES} ${OPENSSL_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} crypt)
 # SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
 
 
 #add_executable(clientApp client/client.c client/login_window.c client/login_window.h client/network.h client/network.c)
 #target_link_libraries(clientApp ${GTK3_LIBRARIES} ${OPENSSL_LIBRARIES} ${GMOD_LIBRARIES} "-rdynamic")
-add_executable(clientApp client/client.c client/network.h client/network.c)
-target_link_libraries(clientApp ${OPENSSL_LIBRARIES})
+add_executable(clientApp client/client.c client/network.c client/login_window.c client/main_window.c globals.c)
+target_include_directories(clientApp PRIVATE ./client/)
+target_link_libraries(clientApp ${GTK3_LIBRARIES} ${OPENSSL_LIBRARIES} ${GMOD_LIBRARIES} "-rdynamic")
 
-add_executable(backupserver datastore/datastore.c datastore/network.h datastore/network.c)
+add_executable(backupserver datastore/datastore.c datastore/network.h datastore/network.c globals.c)
 target_link_libraries(backupserver ${OPENSSL_LIBRARIES})
 
 add_executable(user_mgr user_mgr.c)

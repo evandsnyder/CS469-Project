@@ -6,6 +6,9 @@
 #define CS469_PROJECT_LOGIN_WINDOW_H
 
 #include <gtk/gtk.h>
+#include "network.h"
+// #include "../globals.h"
+#include "main_window.h"
 
 #define BUFFER_SIZE 256
 

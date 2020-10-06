@@ -3,13 +3,14 @@
 //
 
 #include "login_window.h"
-#include "network.h"
 #include "../globals.h"
 
 GtkWidget *usernameBox;
 GtkWidget *passwordBox;
 GtkWidget *serverBox;
 GtkWidget *rememberMeCheckbox;
+GtkWidget *loginWindow;
+gulong destroyHandler;
 char usernameBuffer[BUFFER_SIZE];
 char passwordBuffer[BUFFER_SIZE];
 char serverAddress[BUFFER_SIZE];
@@ -24,9 +25,9 @@ G_MODULE_EXPORT void login(GtkWidget *widget, gpointer arg){
     //    error message
     unsigned int port = DEFAULT_SERVER_PORT;
 
-    printf("Username: %s\n", getUsernameText());
-    printf("Password: %s\n", getPasswordText());
-    printf("Server address: %s\n", getServerAddressText());
+    getUsernameText();
+    getPasswordText();
+    getServerAddressText();
 
     char* tmp;
     char remote_host[BUFFER_SIZE];
@@ -35,10 +36,9 @@ G_MODULE_EXPORT void login(GtkWidget *widget, gpointer arg){
     if(tmp == NULL){
         strncpy(remote_host, serverAddress, BUFFER_SIZE);
     } else {
-        strncpy(remote_host, strtok(serverAddress, ':'), BUFFER_SIZE);
+        strncpy(remote_host, strtok(serverAddress, ":"), BUFFER_SIZE);
         port = (unsigned int) atoi(tmp+sizeof(char));
     }
-
     database_connect(remote_host, port);
 
     bzero(serverAddress, BUFFER_SIZE);
@@ -48,32 +48,57 @@ G_MODULE_EXPORT void login(GtkWidget *widget, gpointer arg){
         fprintf(stderr, "Error writing to server: %s\n", strerror(errno));
     }
 
-    
+    bzero(serverAddress, BUFFER_SIZE);
+    if(SSL_read(ssl, serverAddress, BUFFER_SIZE) <= 0){
+        fprintf(stderr, "Error reading from server: %s\n", strerror(errno));
+        disconnect();
+        exit(-1);
+    }
+
+    if(strcmp("FAILURE", serverAddress) == 0){
+        GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(loginWindow),
+                                                   GTK_DIALOG_DESTROY_WITH_PARENT,
+                                                    GTK_MESSAGE_ERROR,
+                                                    GTK_BUTTONS_CLOSE,
+                                                    "Invalid username or password");
+        g_signal_connect_swapped(dialog, "response", G_CALLBACK(gtk_widget_destroy), dialog);
+        gtk_dialog_run(GTK_DIALOG(dialog));
+        disconnect();
+        return;
+    }
+
+    g_signal_handler_disconnect(loginWindow, destroyHandler);
+
+    create_main_ui();
+    gtk_window_close(GTK_WINDOW(loginWindow));
 }
 
 void create_login_ui(){
     GtkBuilder *builder;
-    GtkWidget *window;
     GError *err = NULL;
 
     builder = gtk_builder_new();
 
-    if(!gtk_builder_add_from_file(builder, "../loginUI.glade", &err)){
+    if(!gtk_builder_add_from_file(builder, "loginUI.glade", &err)){
         g_warning("%s", err->message);
         g_free(err);
         return;
     }
 
-    window = GTK_WIDGET(gtk_builder_get_object(builder, "loginWindow"));
+    loginWindow = GTK_WIDGET(gtk_builder_get_object(builder, "loginWindow"));
     usernameBox = GTK_WIDGET(gtk_builder_get_object(builder, "usernameTextBox"));
     passwordBox = GTK_WIDGET(gtk_builder_get_object(builder, "passwordTextBox"));
     serverBox = GTK_WIDGET(gtk_builder_get_object(builder, "serverAddressTextBox"));
     rememberMeCheckbox = GTK_WIDGET(gtk_builder_get_object(builder, "rememberMeCheckbox"));
+    GtkWidget* loginButton = GTK_WIDGET(gtk_builder_get_object(builder, "loginButton"));
+
+    destroyHandler = g_signal_connect(loginWindow, "delete-event", G_CALLBACK(gtk_main_quit), NULL);
+    // g_signal_connect(loginButton, "clicked", G_CALLBACK (login), (gpointer)"Login");
 
     gtk_builder_connect_signals(builder, NULL);
     g_object_unref(G_OBJECT(builder));
 
-    gtk_widget_show(window);
+    gtk_widget_show(loginWindow);
 }
 
 char* getUsernameText(){

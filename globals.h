@@ -1,4 +1,10 @@
+
+
+#ifndef GLOBALS_H
+#define GLOBALS_H
+
 #include <string.h>
+#include <stdlib.h>
 
 #define MAX_ITEMS 128
 #define DEFAULT_SERVER_PORT 4466
@@ -10,27 +16,44 @@
 #define MAX_CLIENTS 512
 #define SALT_LENGTH 11
 
+#define GROUP_SEPARATOR 0x1d
+#define RECORD_SEPARATOR 0x1e
+#define UNIT_SEPARATOR 0x1f
+
 typedef struct {
     int id;
     char *name;
-    char *description;
     int armor;
     int health;
+    int mana;
+    int sellPrice;
     int damage;
     double critChance;
+    int range;
+    char *description;
 } Item;
 
-void *malloc_aligned(unsigned int size){
-    void *ptr;
-    int r = posix_memalign(&ptr, 1024, size);
-    if(r != 0){
-        perror("Could not allocated memory in malloc_aligned");
-        return NULL;
-    }
+void *malloc_aligned(unsigned int size);
 
-    memset(ptr, 0, size);
-    return ptr;
-}
+typedef struct ll_node_tag {
+    Item* data;
+    struct ll_node_tag* next;
+} ll_node;
+
+typedef struct ll_tag{
+    ll_node *head;
+    ll_node *tail;
+} linked_list;
+
+Item *allocItem(int id, const char* name, int armor, int health, int mana, int sellPrice, int dmg, double critChance, int range, const char* desc);
+void freeItem(Item* item);
+
+void ll_append(linked_list *ll, ll_node* node);
+ll_node *create_node(Item *i);
+linked_list * create_ll();
+void freeLinkedList(linked_list* ll);
+
+#endif
 
 // IGNORE THIS STUFF FOR NOW. JUST Leftovers from the SQL Sample. WILL CLEANUP LATER
 

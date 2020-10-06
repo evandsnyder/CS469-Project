@@ -1048,3 +1048,6 @@ backupserver
 clientApp
 *.pem
 user_mgr
+
+# Debug files
+peda*

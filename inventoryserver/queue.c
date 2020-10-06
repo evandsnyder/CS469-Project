@@ -10,13 +10,6 @@
 
 #define QUEUE_POISON1 ((void*)0xCAFEBAB5)
 
-char *strdup(const char *s){
-    size_t len = strlen(s) + 1;
-    char *r = malloc(len);
-    if(!r) return NULL;
-    return memcpy(r, s, len);
-}
-
 struct queue_root {
     struct queue_head *head;
     pthread_mutex_t head_lock;
@@ -81,4 +74,9 @@ struct queue_head *queue_get(struct queue_root *root)
         head->next = QUEUE_POISON1;
         return head;
     }
+}
+
+void free_queue_message(struct queue_head *msg){
+    free(msg->operation);
+    free(msg);
 }
