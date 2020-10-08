@@ -25,6 +25,10 @@ static error_t parse_args(int key, char *arg, struct argp_state *state);
 int parse_conf_file(void *args);
 int parse_interval(char *interval);
 char * marshalItems(sqlite3_stmt *stmt);
+void new_item_from_row(sqlite3_stmt * stmt, Item * item);
+// void serialize_item(Item * item, char * buff, size_t buflen);
+char* serialize_item(Item* item, char* result);
+void deserialize_item(char * buf, size_t buflen, Item * item, char skip_id);
 
 struct Arguments {
     int listenPort;
@@ -157,7 +161,7 @@ int main(int argc, char *argv[]){
 
         client = accept((int)sockfd, (struct sockaddr*)&addr, &len);
         if(client < 0){
-            fprintf(stderr, "Could not accept client\n");
+            fprintf(stderr, "Failed to accept client\n");
             break;
         }
 
@@ -191,7 +195,6 @@ void *handle_database_thread(void *data){
 
     char request_data[BUFFER_SIZE];
     const char *selectItemsQuery = "SELECT * from items;";
-    const char *insertItemQuery = "INSERT INTO items(name, description, armorPoints, healthPoints, manaPoints, sellPrice, damage, critChance, range) VALUES (?,?,?,?,?,?,?,?,?)";
 
     // Setup Database for operations
     char *valid_schema_query = "SELECT name FROM sqlite_master WHERE type='table' AND name='items' OR name='users'";
@@ -233,12 +236,13 @@ void *handle_database_thread(void *data){
     int flag= 1;
     while(flag){
         struct queue_head *msg = queue_get(db_queue);
-        struct queue_head *response = malloc(sizeof(struct queue_head));
 
         if(msg != NULL){
             char username[BUFFER_SIZE];
             char password[BUFFER_SIZE];
 
+            // Only allocate a response if we have a valid message
+            struct queue_head *response = malloc(sizeof(struct queue_head));
 
             if(sscanf(msg->operation, "AUTH %s %s", username, password) == 2){
                 fprintf(stdout, "DB_THREAD: Authenticating user\n");
@@ -249,28 +253,126 @@ void *handle_database_thread(void *data){
                     INIT_QUEUE_HEAD(response, "SUCCESS", NULL);
             }
 
-            if(strcmp("GET", msg->operation) == 0){
-                fprintf(stdout, "Database: processing get\n");
-                retCode = sqlite3_prepare_v2(db, selectItemsQuery, -1, &stmt, NULL);
-                if(retCode != SQLITE_OK) {
-                    fprintf(stderr, "SQL Error: %s\n", sqlite3_errmsg(db));
-                    INIT_QUEUE_HEAD(response, "FAILURE", NULL);
-                    continue;
+            if(sscanf(msg->operation, "GET %s", request_data) == 1) {
+                // GET all items
+                if (strcmp(request_data, "ALL") == 0) {
+                    const char *sql = "SELECT * FROM items";
+                    sqlite3_stmt *stmt;
+                    sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+
+                    // marshal directly into string:
+                    INIT_QUEUE_HEAD(response, marshalItems(stmt), NULL);
+
+                    sqlite3_finalize(stmt);
+                } else {
+                    int id = atoi(request_data);
+
+                    const char *sql = "SELECT * FROM items WHERE id=?";
+                    sqlite3_stmt *stmt;
+                    sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+                    sqlite3_bind_int(stmt, 1, id);
+
+                    fprintf(stdout, "Getting 1 where id = %d\n", id);
+
+                    int ret = sqlite3_step(stmt);
+                    Item item;
+                    if (ret == SQLITE_ROW) {
+                        new_item_from_row(stmt, &item);
+                        // item found: serialize it into response
+
+                        char* itemInfo;
+                        itemInfo = serialize_item(&item, itemInfo);
+
+                        char* responseString;
+                        asprintf(&responseString, "SUCCESS\n%s", itemInfo);
+
+                        // serialize_item(&item, request_data + strlen(request_data), BUFFER_SIZE - strlen(request_data));
+                        INIT_QUEUE_HEAD(response, responseString, NULL);
+                    } else {
+                        INIT_QUEUE_HEAD(response, "FAILURE", NULL);
+                    }
+
+                    sqlite3_finalize(stmt);
                 }
-                INIT_QUEUE_HEAD(response, marshalItems(stmt), NULL);
-                queue_put(response,msg->response_queue);
             }
 
             if(sscanf(msg->operation, "PUT %s", request_data) == 1){
                 // Insert new item
+                Item item;
+                deserialize_item(request_data, BUFFER_SIZE, &item, 1);
+
+                const char * sql = "INSERT INTO items (name, armorPoints, healthPoints, damage, critChance) VALUES (?, ?, ?, ?, ?)";
+                sqlite3_stmt * stmt;
+                sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+                sqlite3_bind_text(stmt, 1, item.name, strlen(item.name), NULL);
+                sqlite3_bind_int(stmt, 2, item.armor);
+                sqlite3_bind_int(stmt, 3, item.health);
+                sqlite3_bind_int(stmt, 4, item.damage);
+                sqlite3_bind_double(stmt, 5, item.critChance);
+
+                int ret = sqlite3_step(stmt);
+                if (ret == SQLITE_DONE) {
+                    item.id = sqlite3_last_insert_rowid(db);
+                    // success
+                    sprintf(request_data, "SUCCESS\n%d", item.id);
+                    // TODO: memory leak?
+                    INIT_QUEUE_HEAD(response, strdup(request_data), NULL);
+                }
+                else {
+                    INIT_QUEUE_HEAD(response, "FAILURE", NULL);
+                }
+
+                sqlite3_finalize(stmt);
             }
 
             if(sscanf(msg->operation, "MOD %s", request_data) == 1){
                 // Modify existing item
+                Item item;
+                deserialize_item(request_data, BUFFER_SIZE, &item, 0);
+
+                const char * sql = "UPDATE items SET name=?, armorPoints=?, healthPoints=?, damage=?, critChance=? WHERE id=?";
+                sqlite3_stmt * stmt;
+                sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+                sqlite3_bind_text(stmt, 1, item.name, strlen(item.name), NULL);
+                sqlite3_bind_int(stmt, 2, item.armor);
+                sqlite3_bind_int(stmt, 3, item.health);
+                sqlite3_bind_int(stmt, 4, item.damage);
+                sqlite3_bind_double(stmt, 5, item.critChance);
+                sqlite3_bind_int(stmt, 6, item.id);
+
+                int ret = sqlite3_step(stmt);
+                if (ret == SQLITE_DONE) {
+                    // success
+                    INIT_QUEUE_HEAD(response, "SUCCESS", NULL);
+                }
+                else {
+                    // failure
+                    INIT_QUEUE_HEAD(response, "FAILURE", NULL);
+                }
+
+                sqlite3_finalize(stmt);
             }
 
             if(sscanf(msg->operation, "DEL %s", request_data) == 1){
                 // Delete existing
+                int id = atoi(request_data);
+
+                const char * sql = "DELETE FROM items WHERE id=?";
+                sqlite3_stmt * stmt;
+                sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+                sqlite3_bind_int(stmt, 1, id);
+
+                int ret = sqlite3_step(stmt);
+                if (ret == SQLITE_DONE) {
+                    // success
+                    INIT_QUEUE_HEAD(response, "SUCCESS", NULL);
+                }
+                else {
+                    // item not found case
+                    INIT_QUEUE_HEAD(response, "FAILURE", NULL);
+                }
+
+                sqlite3_finalize(stmt);
             }
 
             if(sscanf(msg->operation, "TERM %s", request_data) == 1){
@@ -347,7 +449,7 @@ void *handle_database_thread(void *data){
 
                     break;
                 }
-                
+
                 // shut down connection to remote server
                 if (ssl)
                     SSL_free(ssl);
@@ -466,7 +568,8 @@ void *client_thread(void *data){
         // fprintf(stdout, "%s\n", query->operation);
         queue_put(query, client_info->queue);
 
-        if(strncmp("GET", buffer, strlen(buffer)) == 0){
+
+        if(sscanf(query->operation, "GET %s", buffer) == 1){
             opFlag = CLIENT_GET;
         }
 
@@ -490,12 +593,17 @@ void *client_thread(void *data){
             case CLIENT_MOD:
             case CLIENT_DEL:
             default:
-                fprintf(stderr, "No supported yet\n");
+                fprintf(stderr, "Not supported yet\n");
                 break;
         }
 
         // Free the response and get ready for the next one
         free_queue_message(response);
+    }
+
+    if(response->operation) {
+        // TODO: error handling
+        SSL_write(ssl, response->operation, strlen(response->operation));
     }
 
     SSL_free(ssl);
@@ -559,7 +667,7 @@ int db_login(sqlite3 *db, char *username, char *password) {
  * Determine if there is a valid login.
  *
  * @param hash
- * @param password
+ * @param password]
  * @return
  */
 int authenticate(const char *hash, char *password){
@@ -732,31 +840,22 @@ char * marshalItems(sqlite3_stmt *stmt){
     size_t mem_size = 1024*4;
     char* result = (char*)malloc(sizeof(char)*mem_size); // Allocate 4Kb
     bzero(result, sizeof(char)*mem_size);
-    strncat(result, "DATA ", 5);
+    strncat(result, "SUCCESS ", 9);
 
     int r = SQLITE_OK;
     r = sqlite3_step(stmt);
     while(r == SQLITE_ROW ){
         char* curItem;
-        asprintf(&curItem, "%d%c%s%c%d%c%d%c%d%c%d%c%d%c%f%c%d%c%s%c",
+        asprintf(&curItem, "%d\n%s\n%d\n%d\n%d\n%d\n%d\n%f\n%d\n%s%c",
                  sqlite3_column_int(stmt, 0), // id
-                 UNIT_SEPARATOR,
                  (const char*)sqlite3_column_text(stmt, 1), // name
-                 UNIT_SEPARATOR,
                  sqlite3_column_int(stmt, 2), // armor
-                 UNIT_SEPARATOR,
                  sqlite3_column_int(stmt, 3), // health
-                 UNIT_SEPARATOR,
                  sqlite3_column_int(stmt, 4), // mana
-                 UNIT_SEPARATOR,
                  sqlite3_column_int(stmt, 5), // sellPrice
-                 UNIT_SEPARATOR,
                  sqlite3_column_int(stmt, 6), // damage
-                 UNIT_SEPARATOR,
                  sqlite3_column_double(stmt, 7), // critical
-                 UNIT_SEPARATOR,
                  sqlite3_column_int(stmt, 8), //range
-                 UNIT_SEPARATOR,
                  (const char*)sqlite3_column_text(stmt, 9),
                  RECORD_SEPARATOR
          );
@@ -776,4 +875,77 @@ char * marshalItems(sqlite3_stmt *stmt){
     result[strlen(result)-2] = GROUP_SEPARATOR;
 
     return result;
+}
+void new_item_from_row(sqlite3_stmt * stmt, Item * item) {
+    item->id = sqlite3_column_int(stmt, 0);
+    item->name = strdup((const char*)sqlite3_column_text(stmt, 1));
+    item->armor = sqlite3_column_int(stmt, 2);
+    item->health = sqlite3_column_int(stmt, 3);
+    item->mana = sqlite3_column_int(stmt, 4); // mana
+    item->sellPrice = sqlite3_column_int(stmt, 5); // sell price
+    item->damage = sqlite3_column_int(stmt, 6);
+    item->critChance = sqlite3_column_double(stmt, 7);
+    item->range = sqlite3_column_int(stmt, 8); // range
+    item->description = strdup((const char*)sqlite3_column_text(stmt, 9));
+}
+
+char* serialize_item(Item *item, char* result){
+    asprintf(&result, "%d\n%s\n%d\n%d\n%d\n%d\n%d\n%f\n%d\n%s%c",
+             item->id, // id
+             item->name, // name
+             item->armor, // armor
+             item->health, // health
+             item->mana, // mana
+             item->sellPrice, // sellPrice
+             item->damage, // damage
+             item->critChance, // critical
+             item->range, // range
+             item->description,
+             RECORD_SEPARATOR);
+    return result;
+}
+
+//void serialize_item(Item * item, char * buf, size_t buflen) {
+//    snprintf(buf, buflen, "%d\n%s\n%d\n%d\n%d\n%lf",
+//        item->id,
+//        item->name,
+//        item->armor,
+//        item->health,
+//        item->damage,
+//        item->critChance
+//    );
+//}
+
+void deserialize_item(char * buf, size_t buflen, Item * item, char skip_id) {
+    item->name = malloc(sizeof(char) * 256);
+
+    if (skip_id) {
+        sscanf(buf,"%s\n%d\n%d\n%d\n%d\n%d\n%lf\n%d\n%s%c",
+               item->name,
+               &item->armor,
+               &item->health,
+               &item->mana,
+               &item->sellPrice,
+               &item->damage,
+               &item->critChance,
+               &item->range,
+               item->description,
+               NULL
+        );
+    }
+    else {
+        sscanf(buf, "%d\n%s\n%d\n%d\n%d\n%d\n%d\n%lf\n%d\n%s%c",
+            &item->id,
+            item->name,
+            &item->armor,
+            &item->health,
+            &item->mana,
+            &item->sellPrice,
+            &item->damage,
+            &item->critChance,
+            &item->range,
+            item->description,
+            NULL
+        );
+    }
 }

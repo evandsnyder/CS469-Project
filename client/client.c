@@ -1,15 +1,8 @@
 #include <stdio.h>
 
+#include "../globals.h"
 #include "login_window.h"
 #include "network.h"
-#include "../globals.h"
-
-//#define DEFAULT_SERVER_PORT 4466
-//#define DEFAULT_BACKUP_PORT 6644
-//#define DEFAULT_SERVER "localhost"
-//#define DEFAULT_DATABASE "items.db"
-//#define DEFAULT_INTERVAL 24*60*60
-//#define BUFFER_SIZE 256
 
 void DEBUG_network();
 
@@ -45,8 +38,17 @@ void DEBUG_network(){
     fprintf(stdout, "MSG Received: %s\n", buffer);
 
     bzero(buffer, BUFFER_SIZE);
-    sprintf(buffer, "GET");
+    sprintf(buffer, "GET ALL");
     SSL_write(ssl, buffer, strlen(buffer));
+
+    int rcount = 1;
+    fprintf(stdout, "Message Received: ");
+    while(rcount > 0){
+        rcount = SSL_read(ssl, buffer, BUFFER_SIZE);
+        fprintf(stdout, "%s", buffer);
+    }
+    fprintf(stdout, "\nEnd Message\n\n");
+    return;
 
     size_t mem_size = 1024*4;
     size_t cur_size = 1024*4;
@@ -54,7 +56,7 @@ void DEBUG_network(){
     large_buf[0] = '\0';
 
     fprintf(stdout, "Received from client:\n");
-    int rcount = 1;
+    rcount = 1;
     while(rcount >= 0){
         bzero(buffer, BUFFER_SIZE);
         rcount = SSL_read(ssl, buffer, BUFFER_SIZE);
