@@ -1,5 +1,3 @@
-#define _GNU_SOURCE
-
 #include <stdio.h>
 #include <argp.h>
 #include <stdlib.h>
@@ -11,11 +9,6 @@
 #include "network.h"
 #include "queue.h"
 
-#define CLIENT_GET 1
-#define CLIENT_PUT 2
-#define CLIENT_MOD 3
-#define CLIENT_DEL 4
-
 void *handle_database_thread(void *data);
 void *client_thread(void *data);
 void *timer_thread_handler(void *data);
@@ -26,9 +19,6 @@ int parse_conf_file(void *args);
 int parse_interval(char *interval);
 char * marshalItems(sqlite3_stmt *stmt);
 void new_item_from_row(sqlite3_stmt * stmt, Item * item);
-// void serialize_item(Item * item, char * buff, size_t buflen);
-char* serialize_item(Item* item, char* result);
-void deserialize_item(char * buf, size_t buflen, Item * item, char skip_id);
 
 struct Arguments {
     int listenPort;
@@ -299,7 +289,7 @@ void *handle_database_thread(void *data){
             if(sscanf(msg->operation, "PUT %s", request_data) == 1){
                 // Insert new item
                 Item item;
-                deserialize_item(request_data, BUFFER_SIZE, &item, 1);
+                deserialize_item(request_data, &item);
 
                 const char * sql = "INSERT INTO items (name, armorPoints, healthPoints, damage, critChance) VALUES (?, ?, ?, ?, ?)";
                 sqlite3_stmt * stmt;
@@ -328,7 +318,7 @@ void *handle_database_thread(void *data){
             if(sscanf(msg->operation, "MOD %s", request_data) == 1){
                 // Modify existing item
                 Item item;
-                deserialize_item(request_data, BUFFER_SIZE, &item, 0);
+                deserialize_item(request_data, &item);
 
                 const char * sql = "UPDATE items SET name=?, armorPoints=?, healthPoints=?, damage=?, critChance=? WHERE id=?";
                 sqlite3_stmt * stmt;
@@ -872,7 +862,7 @@ char * marshalItems(sqlite3_stmt *stmt){
 
     // Replace last character with group separator
     // -1 should be \x0, -2 should be RECORD_SEPARATOR
-    result[strlen(result)-2] = GROUP_SEPARATOR;
+    result[strlen(result)-1] = GROUP_SEPARATOR;
 
     return result;
 }
@@ -887,65 +877,4 @@ void new_item_from_row(sqlite3_stmt * stmt, Item * item) {
     item->critChance = sqlite3_column_double(stmt, 7);
     item->range = sqlite3_column_int(stmt, 8); // range
     item->description = strdup((const char*)sqlite3_column_text(stmt, 9));
-}
-
-char* serialize_item(Item *item, char* result){
-    asprintf(&result, "%d\n%s\n%d\n%d\n%d\n%d\n%d\n%f\n%d\n%s%c",
-             item->id, // id
-             item->name, // name
-             item->armor, // armor
-             item->health, // health
-             item->mana, // mana
-             item->sellPrice, // sellPrice
-             item->damage, // damage
-             item->critChance, // critical
-             item->range, // range
-             item->description,
-             RECORD_SEPARATOR);
-    return result;
-}
-
-//void serialize_item(Item * item, char * buf, size_t buflen) {
-//    snprintf(buf, buflen, "%d\n%s\n%d\n%d\n%d\n%lf",
-//        item->id,
-//        item->name,
-//        item->armor,
-//        item->health,
-//        item->damage,
-//        item->critChance
-//    );
-//}
-
-void deserialize_item(char * buf, size_t buflen, Item * item, char skip_id) {
-    item->name = malloc(sizeof(char) * 256);
-
-    if (skip_id) {
-        sscanf(buf,"%s\n%d\n%d\n%d\n%d\n%d\n%lf\n%d\n%s%c",
-               item->name,
-               &item->armor,
-               &item->health,
-               &item->mana,
-               &item->sellPrice,
-               &item->damage,
-               &item->critChance,
-               &item->range,
-               item->description,
-               NULL
-        );
-    }
-    else {
-        sscanf(buf, "%d\n%s\n%d\n%d\n%d\n%d\n%d\n%lf\n%d\n%s%c",
-            &item->id,
-            item->name,
-            &item->armor,
-            &item->health,
-            &item->mana,
-            &item->sellPrice,
-            &item->damage,
-            &item->critChance,
-            &item->range,
-            item->description,
-            NULL
-        );
-    }
 }

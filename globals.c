@@ -17,72 +17,43 @@ void *malloc_aligned(unsigned int size){
     return ptr;
 }
 
-
-Item *allocItem(int id, const char* name, int armor, int health, int mana, int sellPrice, int dmg, double critChance, int range, const char* desc){
-    Item *item = malloc(sizeof(Item));
-    if(item == NULL)
-        return NULL;
-
-    item->id = id;
-    item->name = strdup(name);
-    if(!item->name){
-        free(item);
-        return NULL;
-    }
-
-    item->description = strdup(desc);
-    if(!item->description){
-        free(item);
-        return NULL;
-    }
-
-    item->armor = armor;
-    item->health = health;
-    item->damage = dmg;
-    item->critChance = critChance;
-    item->mana = mana;
-    item->sellPrice = sellPrice;
-    item->range = range;
-
-    return item;
-}
-
 void freeItem(Item* item){
     free(item->description);
     free(item->name);
     free(item);
 }
 
-void ll_append(linked_list *ll, ll_node* node){
-    node->next = NULL;
-    if(ll->head == NULL) {
-        ll->head = node;
-        ll->tail = node;
-    }
-    ll->tail->next=node;
-    ll->tail = node;
+char* serialize_item(Item *item, char* result){
+    asprintf(&result, "%d\n%s\n%d\n%d\n%d\n%d\n%d\n%f\n%d\n%s%c",
+             item->id, // id
+             item->name, // name
+             item->armor, // armor
+             item->health, // health
+             item->mana, // mana
+             item->sellPrice, // sellPrice
+             item->damage, // damage
+             item->critChance, // critical
+             item->range, // range
+             item->description,
+             RECORD_SEPARATOR);
+    return result;
 }
 
-ll_node *create_node(Item *i){
-    ll_node* n = (ll_node*)malloc(sizeof(ll_node));
-    n->data = i;
-    n->next = NULL;
-    return n;
-}
+void deserialize_item(char *buf, Item *item) {
+    item->name = malloc(sizeof(char) * 256);
+    item->description = malloc(sizeof(char)*256);
 
-linked_list * create_ll(){
-    linked_list *ll = (linked_list*)malloc(sizeof(linked_list));
-    ll->head = NULL;
-    ll->tail = NULL;
-    return ll;
-}
-
-void freeLinkedList(linked_list* ll){
-    ll_node *cur = ll->head;
-    while(cur != NULL){
-        ll_node *next = cur->next;
-        freeItem(cur->data);
-        free(cur);
-        cur = next;
-    }
+    sscanf(buf, "%d\n%s\n%d\n%d\n%d\n%d\n%d\n%lf\n%d\n%s%c",
+           &item->id,
+           item->name,
+           &item->armor,
+           &item->health,
+           &item->mana,
+           &item->sellPrice,
+           &item->damage,
+           &item->critChance,
+           &item->range,
+           item->description,
+           NULL
+    );
 }

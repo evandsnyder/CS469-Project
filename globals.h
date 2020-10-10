@@ -3,10 +3,13 @@
 #ifndef GLOBALS_H
 #define GLOBALS_H
 
+#define _GNU_SOURCE
+
 #include <string.h>
 #include <stdlib.h>
+#include <stdio.h>
 
-#define MAX_ITEMS 128
+#define MAX_ITEMS 1024
 #define DEFAULT_SERVER_PORT 4466
 #define DEFAULT_BACKUP_PORT 6644
 #define DEFAULT_SERVER "localhost"
@@ -19,6 +22,11 @@
 #define GROUP_SEPARATOR 0x1d
 #define RECORD_SEPARATOR 0x1e
 #define UNIT_SEPARATOR 0x1f
+
+#define CLIENT_GET 1
+#define CLIENT_PUT 2
+#define CLIENT_MOD 3
+#define CLIENT_DEL 4
 
 typedef struct {
     int id;
@@ -35,23 +43,9 @@ typedef struct {
 
 void *malloc_aligned(unsigned int size);
 
-typedef struct ll_node_tag {
-    Item* data;
-    struct ll_node_tag* next;
-} ll_node;
-
-typedef struct ll_tag{
-    ll_node *head;
-    ll_node *tail;
-} linked_list;
-
-Item *allocItem(int id, const char* name, int armor, int health, int mana, int sellPrice, int dmg, double critChance, int range, const char* desc);
 void freeItem(Item* item);
-
-void ll_append(linked_list *ll, ll_node* node);
-ll_node *create_node(Item *i);
-linked_list * create_ll();
-void freeLinkedList(linked_list* ll);
+char* serialize_item(Item* item, char* result);
+void deserialize_item(char *buf, Item *item);
 
 #endif
 
