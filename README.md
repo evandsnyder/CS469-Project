@@ -24,4 +24,4 @@ We've chosen prompt 2 for our distributed systems assignment
  * ~~Timer Thread~~
  * ~~Datastore SSL/TLS Listen~~
  * ~~Datastore SSL download and store file~~
- * Datastore config file
+ * ~~Datastore config file~~

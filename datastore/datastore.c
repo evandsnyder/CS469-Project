@@ -7,14 +7,17 @@
 
 char secure_compare(char * bufa, char * bufb, size_t len);
 void cleanup_connection(SSL * ssl, int clientFd);
+int parse_conf_file(void *args);
 
 struct Arguments {
     int listenPort;
     char *psk;
+    char *filename;
 };
 static struct argp_option options[] = {
         {"listen-port",'l',"<port>", 0, "Port to listen on. Default: 6644"},
         {"key",'k',"<key>", 0, "Pre-shared key used to authenticate remote server."},
+        {"config", 'c', "<filename>", 0, "A config file that can be used in lieu of CLI arguments. This will override all CLI arguments."},
         {0}
 };
 
@@ -29,6 +32,9 @@ static error_t parse_args(int key, char *arg, struct argp_state *state){
         case 'k':
             arguments->psk = arg;
             break;
+        case 'c':
+            arguments->filename = arg;
+            break;
         default:
             return ARGP_ERR_UNKNOWN;
     }
@@ -41,10 +47,15 @@ int main(int argc, char *argv[]){
     struct Arguments arguments = {0};
     arguments.listenPort = DEFAULT_BACKUP_PORT;
     arguments.psk = "";
+    arguments.filename = NULL;
 
     argp_parse(&argp, argc, argv, 0, 0, &arguments);
+    if(arguments.filename != NULL) parse_conf_file(&arguments);
 
     printf("Hello from datastore!\n");
+    printf("Provided args:\n");
+    printf("\tListen port: %d\n", arguments.listenPort);
+    printf("\tConfig file: %s\n", arguments.filename ? arguments.filename: "NULL");
 
     int serverFd = create_socket(arguments.listenPort);
     if (serverFd < 0) {
@@ -163,4 +174,42 @@ char secure_compare(char * bufa, char * bufb, size_t len) {
         if (bufa[i] != bufb[i])
             ret = 0;
     return ret;
+}
+
+int parse_conf_file(void *args){
+    struct Arguments *arguments = (struct Arguments *)args;
+    char field[BUFFER_SIZE];
+    char value[BUFFER_SIZE];
+    int val;
+    char *stop;
+
+    FILE *file;
+    file = fopen(arguments->filename, "r");
+    if(file == NULL){
+        fprintf(stderr, "Error opening config file: %s\n", strerror(errno));
+        return -1;
+    }
+
+    while(fscanf(file, "%127[^=]=%127[^\n]%*c", field, value) == 2){
+        stop = NULL;
+        if(strcmp(field, "PORT") == 0){
+            val = strtol(value, &stop, 10);
+            if(stop == NULL || *stop != '\0'){
+                fprintf(stderr, "Error interpreting port: %s\n", value);
+                fclose(file);
+                return -1;
+            }
+            arguments->listenPort = val;
+        }
+
+        if(strcmp(field, "BACKUP_PSK") == 0){
+            arguments->psk = strdup(value);
+        }
+
+        bzero(field, BUFFER_SIZE);
+        bzero(value, BUFFER_SIZE);
+    }
+
+
+    return 0;
 }
