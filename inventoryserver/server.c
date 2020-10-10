@@ -184,7 +184,6 @@ void *handle_database_thread(void *data){
     struct queue_root *db_queue = info->queue;
 
     char request_data[BUFFER_SIZE];
-    const char *selectItemsQuery = "SELECT * from items;";
 
     // Setup Database for operations
     char *valid_schema_query = "SELECT name FROM sqlite_master WHERE type='table' AND name='items' OR name='users'";
@@ -489,6 +488,10 @@ void *handle_database_thread(void *data){
 
         usleep(10000); // Wait 10 ms between reads
     }
+
+    sqlite3_close(db);
+
+    return NULL;
 }
 
 /**

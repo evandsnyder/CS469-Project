@@ -13,13 +13,13 @@ We've chosen prompt 2 for our distributed systems assignment
 * ~~Server argument parsing~~
 * ~~Server SSL/TLS Listening~~
 * ~~Server Multithreaded Client Accept~~
-* Server database operations thread
-  * Open Database
-  * Read from request queues
-  * Do Operation
-  * Send reponse back to requesting thread
+* ~~Server database operations thread~~
+  * ~~Open Database~~
+  * ~~Read from request queues~~
+  * ~~Do Operation~~
+  * ~~Send reponse back to requesting thread~~
   * ~~Periodic backup to datastore server~~
-  * DB Shutdown and closing
+  * ~~DB Shutdown and closing~~
  * ~~Server Threadsafe queue~~
  * ~~Timer Thread~~
  * ~~Datastore SSL/TLS Listen~~
