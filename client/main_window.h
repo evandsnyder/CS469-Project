@@ -6,7 +6,9 @@
 #define CS469_PROJECT_MAIN_WINDOW_H
 
 #include <gtk/gtk.h>
+#include "../globals.h"
 
 void create_main_ui();
+Item * get_all_items_from_database();
 
 #endif //CS469_PROJECT_MAIN_WINDOW_H

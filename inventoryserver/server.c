@@ -4,6 +4,7 @@
 #include <pthread.h>
 #include <sqlite3.h>
 #include <fcntl.h>
+#include <crypt.h>
 
 #include "../globals.h"
 #include "network.h"

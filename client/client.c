@@ -9,16 +9,16 @@ void DEBUG_network();
 int main(int argc, char** argv){
     printf("Hello from client!\n");
 
-    DEBUG_network();
+    // DEBUG_network();
 
-//    gtk_init(&argc, &argv);
-//
-//    create_login_ui();
-//    gtk_main();
+    gtk_init(&argc, &argv);
+
+    create_login_ui();
+    gtk_main();
 
     return 0;
 }
-
+//
 void DEBUG_network() {
     char buffer[BUFFER_SIZE];
     if (database_connect(DEFAULT_SERVER, DEFAULT_SERVER_PORT) < 0) {
