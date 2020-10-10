@@ -286,7 +286,7 @@ void *handle_database_thread(void *data){
                 }
             }
 
-            if(sscanf(msg->operation, "PUT %s", request_data) == 1){
+            if(sscanf(msg->operation, "PUT %[^\x1e]", request_data) == 1){
                 // Insert new item
                 Item item;
                 deserialize_item(request_data, &item);
@@ -315,7 +315,7 @@ void *handle_database_thread(void *data){
                 sqlite3_finalize(stmt);
             }
 
-            if(sscanf(msg->operation, "MOD %s", request_data) == 1){
+            if(sscanf(msg->operation, "MOD %[^\x1e]", request_data) == 1){
                 // Modify existing item
                 Item item;
                 deserialize_item(request_data, &item);
@@ -562,6 +562,9 @@ void *client_thread(void *data){
         if(sscanf(query->operation, "GET %s", buffer) == 1){
             opFlag = CLIENT_GET;
         }
+        else if(sscanf(query->operation, "DEL %s", buffer) == 1){
+            opFlag = CLIENT_DEL;
+        }
 
         response = NULL;
         do{
@@ -571,17 +574,17 @@ void *client_thread(void *data){
 
         switch(opFlag){
             case CLIENT_GET:
+            case CLIENT_DEL:
                 if((rcount = SSL_write(ssl, response->operation, (int)strlen(response->operation))) < 0){
                     fprintf(stderr, "Error writing to client: %s\n", strerror(errno));
                     validLogin = 0;
                     continue;
                 }
-                fprintf(stdout,"wrote %d, bytes\n", rcount);
+                fprintf(stdout, "wrote %d bytes\n", rcount);
 
                 break;
             case CLIENT_PUT:
             case CLIENT_MOD:
-            case CLIENT_DEL:
             default:
                 fprintf(stderr, "Not supported yet\n");
                 break;

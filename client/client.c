@@ -25,6 +25,8 @@ void DEBUG_network() {
         fprintf(stderr, "Could not connect to server\n");
     }
 
+    //////
+    // auth
     bzero(buffer, BUFFER_SIZE);
     //sprintf(buffer, "AUTH %s %s", "esnyder", "password");
     sprintf(buffer, "AUTH %s %s", "esnyder", "abcd123");
@@ -37,6 +39,17 @@ void DEBUG_network() {
 
     fprintf(stdout, "MSG Received: %s\n", buffer);
 
+    //////
+    // test add/mod/del
+    bzero(buffer, BUFFER_SIZE);
+    sprintf(buffer, "DEL %d", 150);
+    SSL_write(ssl, buffer, strlen(buffer));
+    bzero(buffer, BUFFER_SIZE);
+    SSL_read(ssl, buffer, BUFFER_SIZE);
+    fprintf(stdout, "MSG Received: %s\n", buffer);
+
+    //////
+    // get all and print results
     bzero(buffer, BUFFER_SIZE);
     sprintf(buffer, "GET ALL");
     SSL_write(ssl, buffer, strlen(buffer));
