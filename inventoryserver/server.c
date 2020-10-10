@@ -291,14 +291,21 @@ void *handle_database_thread(void *data){
                 Item item;
                 deserialize_item(request_data, &item);
 
-                const char * sql = "INSERT INTO items (name, armorPoints, healthPoints, damage, critChance) VALUES (?, ?, ?, ?, ?)";
+                const char * sql = "INSERT INTO items "
+                    "(name, armorPoints, healthPoints, manaPoints, sellPrice,"
+                    " damage, critChance, range, description) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
                 sqlite3_stmt * stmt;
                 sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
                 sqlite3_bind_text(stmt, 1, item.name, strlen(item.name), NULL);
                 sqlite3_bind_int(stmt, 2, item.armor);
                 sqlite3_bind_int(stmt, 3, item.health);
-                sqlite3_bind_int(stmt, 4, item.damage);
-                sqlite3_bind_double(stmt, 5, item.critChance);
+                sqlite3_bind_int(stmt, 4, item.mana);
+                sqlite3_bind_int(stmt, 5, item.sellPrice);
+                sqlite3_bind_int(stmt, 6, item.damage);
+                sqlite3_bind_double(stmt, 7, item.critChance);
+                sqlite3_bind_int(stmt, 8, item.range);
+                sqlite3_bind_text(stmt, 9, item.description, strlen(item.description), NULL);
 
                 int ret = sqlite3_step(stmt);
                 if (ret == SQLITE_DONE) {
@@ -320,15 +327,22 @@ void *handle_database_thread(void *data){
                 Item item;
                 deserialize_item(request_data, &item);
 
-                const char * sql = "UPDATE items SET name=?, armorPoints=?, healthPoints=?, damage=?, critChance=? WHERE id=?";
+                const char * sql = "UPDATE items SET "
+                    "name=?, armorPoints=?, healthPoints=?, manaPoints=?, "
+                    "sellPrice=?, damage=?, critChance=?, range=?, description=? "
+                    "WHERE id=?";
                 sqlite3_stmt * stmt;
                 sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
                 sqlite3_bind_text(stmt, 1, item.name, strlen(item.name), NULL);
                 sqlite3_bind_int(stmt, 2, item.armor);
                 sqlite3_bind_int(stmt, 3, item.health);
-                sqlite3_bind_int(stmt, 4, item.damage);
-                sqlite3_bind_double(stmt, 5, item.critChance);
-                sqlite3_bind_int(stmt, 6, item.id);
+                sqlite3_bind_int(stmt, 4, item.mana);
+                sqlite3_bind_int(stmt, 5, item.sellPrice);
+                sqlite3_bind_int(stmt, 6, item.damage);
+                sqlite3_bind_double(stmt, 7, item.critChance);
+                sqlite3_bind_int(stmt, 8, item.range);
+                sqlite3_bind_text(stmt, 9, item.description, strlen(item.description), NULL);
+                sqlite3_bind_int(stmt, 10, item.id);
 
                 int ret = sqlite3_step(stmt);
                 if (ret == SQLITE_DONE) {
@@ -562,6 +576,12 @@ void *client_thread(void *data){
         if(sscanf(query->operation, "GET %s", buffer) == 1){
             opFlag = CLIENT_GET;
         }
+        else if(sscanf(query->operation, "PUT %s", buffer) == 1){
+            opFlag = CLIENT_PUT;
+        }
+        else if(sscanf(query->operation, "MOD %s", buffer) == 1){
+            opFlag = CLIENT_MOD;
+        }
         else if(sscanf(query->operation, "DEL %s", buffer) == 1){
             opFlag = CLIENT_DEL;
         }
@@ -574,6 +594,8 @@ void *client_thread(void *data){
 
         switch(opFlag){
             case CLIENT_GET:
+            case CLIENT_PUT:
+            case CLIENT_MOD:
             case CLIENT_DEL:
                 if((rcount = SSL_write(ssl, response->operation, (int)strlen(response->operation))) < 0){
                     fprintf(stderr, "Error writing to client: %s\n", strerror(errno));
@@ -583,8 +605,6 @@ void *client_thread(void *data){
                 fprintf(stdout, "wrote %d bytes\n", rcount);
 
                 break;
-            case CLIENT_PUT:
-            case CLIENT_MOD:
             default:
                 fprintf(stderr, "Not supported yet\n");
                 break;

@@ -41,12 +41,27 @@ void DEBUG_network() {
 
     //////
     // test add/mod/del
+    Item test_item;
+    //test_item.id=-1;
+    test_item.id=149;
+    test_item.name="test item";
+    test_item.armor=42;
+    test_item.health=75;
+    test_item.mana=3;
+    test_item.sellPrice=123;
+    test_item.damage=321;
+    test_item.critChance=0.05;
+    test_item.range=100;
+    test_item.description="things and stuff";
+
     bzero(buffer, BUFFER_SIZE);
-    sprintf(buffer, "DEL %d", 150);
+    //sprintf(buffer, "DEL %d", 150);
+    sprintf(buffer, "MOD %s", serialize_item(&test_item, NULL));
     SSL_write(ssl, buffer, strlen(buffer));
     bzero(buffer, BUFFER_SIZE);
     SSL_read(ssl, buffer, BUFFER_SIZE);
     fprintf(stdout, "MSG Received: %s\n", buffer);
+    //return;
 
     //////
     // get all and print results
