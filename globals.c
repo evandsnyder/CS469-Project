@@ -43,7 +43,7 @@ void deserialize_item(char *buf, Item *item) {
     item->name = malloc(sizeof(char) * 256);
     item->description = malloc(sizeof(char)*256);
 
-    sscanf(buf, "%d\n%s\n%d\n%d\n%d\n%d\n%d\n%lf\n%d\n%s%c",
+    sscanf(buf, "%d\n%[^\n]\n%d\n%d\n%d\n%d\n%d\n%lf\n%d\n%[^\x1e]%c",
            &item->id,
            item->name,
            &item->armor,
