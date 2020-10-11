@@ -877,6 +877,8 @@ char * marshalItems(sqlite3_stmt *stmt){
                  RECORD_SEPARATOR
          );
 
+        fprintf(stdout, "\n%s\n", curItem);
+
         // Need to append
         if(strlen(curItem) + strlen(result) >= cur_size){ // Amount of data is too large, we need to add more memory
             cur_size += mem_size;
@@ -893,6 +895,7 @@ char * marshalItems(sqlite3_stmt *stmt){
 
     return result;
 }
+
 void new_item_from_row(sqlite3_stmt * stmt, Item * item) {
     item->id = sqlite3_column_int(stmt, 0);
     item->name = strdup((const char*)sqlite3_column_text(stmt, 1));

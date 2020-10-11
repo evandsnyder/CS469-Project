@@ -5,7 +5,6 @@
   <object class="GtkAdjustment" id="adjustment1">
     <property name="lower">-5000</property>
     <property name="upper">5000</property>
-    <property name="value">-0.00000000000000000347</property>
     <property name="step_increment">0.1</property>
     <property name="page_increment">10</property>
   </object>
@@ -46,136 +45,146 @@
         <property name="can_focus">False</property>
         <property name="orientation">vertical</property>
         <child>
-          <object class="GtkTreeView" id="itemTreeView">
+          <object class="GtkScrolledWindow">
             <property name="visible">True</property>
             <property name="can_focus">True</property>
-            <property name="margin_start">10</property>
-            <property name="margin_end">10</property>
-            <property name="hexpand">True</property>
-            <property name="vexpand">True</property>
-            <property name="hadjustment">adjustment1</property>
-            <property name="hscroll_policy">natural</property>
-            <property name="model">itemListStore</property>
-            <child internal-child="selection">
-              <object class="GtkTreeSelection"/>
-            </child>
+            <property name="shadow_type">in</property>
             <child>
-              <object class="GtkTreeViewColumn">
-                <property name="resizable">True</property>
-                <property name="title" translatable="yes">ID</property>
-                <child>
-                  <object class="GtkCellRendererText" id="id_spin"/>
-                  <attributes>
-                    <attribute name="text">0</attribute>
-                  </attributes>
+              <object class="GtkTreeView" id="itemTreeView">
+                <property name="visible">True</property>
+                <property name="can_focus">True</property>
+                <property name="margin_left">10</property>
+                <property name="margin_right">10</property>
+                <property name="margin_start">10</property>
+                <property name="margin_end">10</property>
+                <property name="hexpand">True</property>
+                <property name="vexpand">True</property>
+                <property name="hadjustment">adjustment1</property>
+                <property name="hscroll_policy">natural</property>
+                <property name="model">itemListStore</property>
+                <property name="search_column">0</property>
+                <child internal-child="selection">
+                  <object class="GtkTreeSelection"/>
                 </child>
-              </object>
-            </child>
-            <child>
-              <object class="GtkTreeViewColumn">
-                <property name="resizable">True</property>
-                <property name="title" translatable="yes">Name</property>
                 <child>
-                  <object class="GtkCellRendererText" id="name_spin"/>
-                  <attributes>
-                    <attribute name="text">1</attribute>
-                  </attributes>
+                  <object class="GtkTreeViewColumn">
+                    <property name="resizable">True</property>
+                    <property name="title" translatable="yes">ID</property>
+                    <child>
+                      <object class="GtkCellRendererText" id="id_spin"/>
+                      <attributes>
+                        <attribute name="text">0</attribute>
+                      </attributes>
+                    </child>
+                  </object>
                 </child>
-              </object>
-            </child>
-            <child>
-              <object class="GtkTreeViewColumn">
-                <property name="resizable">True</property>
-                <property name="title" translatable="yes">Armor</property>
                 <child>
-                  <object class="GtkCellRendererText" id="armor_spin"/>
-                  <attributes>
-                    <attribute name="text">2</attribute>
-                  </attributes>
+                  <object class="GtkTreeViewColumn">
+                    <property name="resizable">True</property>
+                    <property name="title" translatable="yes">Name</property>
+                    <child>
+                      <object class="GtkCellRendererText" id="name_spin"/>
+                      <attributes>
+                        <attribute name="text">1</attribute>
+                      </attributes>
+                    </child>
+                  </object>
                 </child>
-              </object>
-            </child>
-            <child>
-              <object class="GtkTreeViewColumn">
-                <property name="resizable">True</property>
-                <property name="title" translatable="yes">Health</property>
                 <child>
-                  <object class="GtkCellRendererText" id="heatlh_spin"/>
-                  <attributes>
-                    <attribute name="text">3</attribute>
-                  </attributes>
+                  <object class="GtkTreeViewColumn">
+                    <property name="resizable">True</property>
+                    <property name="title" translatable="yes">Armor</property>
+                    <child>
+                      <object class="GtkCellRendererText" id="armor_spin"/>
+                      <attributes>
+                        <attribute name="text">2</attribute>
+                      </attributes>
+                    </child>
+                  </object>
                 </child>
-              </object>
-            </child>
-            <child>
-              <object class="GtkTreeViewColumn">
-                <property name="resizable">True</property>
-                <property name="title" translatable="yes">Mana</property>
                 <child>
-                  <object class="GtkCellRendererText" id="mana_spin"/>
-                  <attributes>
-                    <attribute name="text">4</attribute>
-                  </attributes>
+                  <object class="GtkTreeViewColumn">
+                    <property name="resizable">True</property>
+                    <property name="title" translatable="yes">Health</property>
+                    <child>
+                      <object class="GtkCellRendererText" id="heatlh_spin"/>
+                      <attributes>
+                        <attribute name="text">3</attribute>
+                      </attributes>
+                    </child>
+                  </object>
                 </child>
-              </object>
-            </child>
-            <child>
-              <object class="GtkTreeViewColumn">
-                <property name="resizable">True</property>
-                <property name="title" translatable="yes">Sell Price</property>
                 <child>
-                  <object class="GtkCellRendererText" id="sellPrice_spin"/>
-                  <attributes>
-                    <attribute name="text">5</attribute>
-                  </attributes>
+                  <object class="GtkTreeViewColumn">
+                    <property name="resizable">True</property>
+                    <property name="title" translatable="yes">Mana</property>
+                    <child>
+                      <object class="GtkCellRendererText" id="mana_spin"/>
+                      <attributes>
+                        <attribute name="text">4</attribute>
+                      </attributes>
+                    </child>
+                  </object>
                 </child>
-              </object>
-            </child>
-            <child>
-              <object class="GtkTreeViewColumn">
-                <property name="resizable">True</property>
-                <property name="title" translatable="yes">Damage</property>
                 <child>
-                  <object class="GtkCellRendererText" id="dmg_spin"/>
-                  <attributes>
-                    <attribute name="text">6</attribute>
-                  </attributes>
+                  <object class="GtkTreeViewColumn">
+                    <property name="resizable">True</property>
+                    <property name="title" translatable="yes">Sell Price</property>
+                    <child>
+                      <object class="GtkCellRendererText" id="sellPrice_spin"/>
+                      <attributes>
+                        <attribute name="text">5</attribute>
+                      </attributes>
+                    </child>
+                  </object>
                 </child>
-              </object>
-            </child>
-            <child>
-              <object class="GtkTreeViewColumn">
-                <property name="resizable">True</property>
-                <property name="title" translatable="yes">Crit Chance</property>
                 <child>
-                  <object class="GtkCellRendererText" id="crit_spin"/>
-                  <attributes>
-                    <attribute name="text">7</attribute>
-                  </attributes>
+                  <object class="GtkTreeViewColumn">
+                    <property name="resizable">True</property>
+                    <property name="title" translatable="yes">Damage</property>
+                    <child>
+                      <object class="GtkCellRendererText" id="dmg_spin"/>
+                      <attributes>
+                        <attribute name="text">6</attribute>
+                      </attributes>
+                    </child>
+                  </object>
                 </child>
-              </object>
-            </child>
-            <child>
-              <object class="GtkTreeViewColumn">
-                <property name="resizable">True</property>
-                <property name="title" translatable="yes">Range</property>
                 <child>
-                  <object class="GtkCellRendererText" id="range_spin"/>
-                  <attributes>
-                    <attribute name="text">8</attribute>
-                  </attributes>
+                  <object class="GtkTreeViewColumn">
+                    <property name="resizable">True</property>
+                    <property name="title" translatable="yes">Crit Chance</property>
+                    <child>
+                      <object class="GtkCellRendererText" id="crit_spin"/>
+                      <attributes>
+                        <attribute name="text">7</attribute>
+                      </attributes>
+                    </child>
+                  </object>
                 </child>
-              </object>
-            </child>
-            <child>
-              <object class="GtkTreeViewColumn">
-                <property name="resizable">True</property>
-                <property name="title" translatable="yes">Description</property>
                 <child>
-                  <object class="GtkCellRendererText" id="desc_spin"/>
-                  <attributes>
-                    <attribute name="text">9</attribute>
-                  </attributes>
+                  <object class="GtkTreeViewColumn">
+                    <property name="resizable">True</property>
+                    <property name="title" translatable="yes">Range</property>
+                    <child>
+                      <object class="GtkCellRendererText" id="range_spin"/>
+                      <attributes>
+                        <attribute name="text">8</attribute>
+                      </attributes>
+                    </child>
+                  </object>
+                </child>
+                <child>
+                  <object class="GtkTreeViewColumn">
+                    <property name="resizable">True</property>
+                    <property name="title" translatable="yes">Description</property>
+                    <child>
+                      <object class="GtkCellRendererText" id="desc_spin"/>
+                      <attributes>
+                        <attribute name="text">9</attribute>
+                      </attributes>
+                    </child>
+                  </object>
                 </child>
               </object>
             </child>
@@ -183,7 +192,6 @@
           <packing>
             <property name="expand">True</property>
             <property name="fill">True</property>
-            <property name="padding">10</property>
             <property name="position">0</property>
           </packing>
         </child>

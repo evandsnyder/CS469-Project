@@ -37,7 +37,7 @@ void display_error_dialog(char* msg){
 }
 
 Item * get_all_items_from_database(){
-    char buffer[BUFFER_SIZE] = {0};
+    char buffer[BUFFER_SIZE + 1] = {0};
     sprintf(buffer, "GET ALL");
     SSL_write(ssl, buffer, strlen(buffer));
 
@@ -51,7 +51,7 @@ Item * get_all_items_from_database(){
     size_t mem_size = 1024*4;
     size_t cur_size = 1024*4;
     char* allItems = (char*)malloc(sizeof(char)*mem_size);
-    allItems[0] = '\0';
+    bzero(allItems, mem_size);
     do{
         if(strlen(buffer) + strlen(allItems) >= cur_size){
             cur_size += mem_size;
@@ -63,7 +63,13 @@ Item * get_all_items_from_database(){
         SSL_read(ssl, buffer, BUFFER_SIZE);
     } while(buffer[strlen(buffer)-1] != GROUP_SEPARATOR);
 
-    fprintf(stdout, "RECEIVED DATA: %s\n", allItems);
+
+    // EXPERIMENTAL
+    if(strlen(buffer) + strlen(allItems) >= cur_size){
+        cur_size += mem_size;
+        allItems = realloc(allItems, cur_size);
+    }
+    strncat(allItems, buffer, strlen(buffer)-1);
 
     // Need to remove first SUCCESS\n bytes
     allItems += 8;
@@ -83,14 +89,6 @@ Item * get_all_items_from_database(){
         items[available++] = *newItem;
         token = strtok(NULL, str2);
     }
-
-//    for(int i =0; i < available; i++){
-//    Item* cur = &items[i];
-//    fprintf(stdout, "%s {%d, %d, %d, %d, %d, %f, %d, %s}\n",
-//            cur->name, cur->armor, cur->health, cur->mana,
-//            cur->sellPrice, cur->damage, cur->critChance, cur->range,
-//            cur->description);
-//    }
 
     return items;
 }
@@ -137,11 +135,6 @@ void create_main_ui(){
                 RANGE, item->range,
                 DESCRIPTION, item->description,
                 -1);
-
-        fprintf(stdout, "%s {%d, %d, %d, %d, %d, %f, %d, %s}\n",
-                item->name, item->armor, item->health, item->mana,
-                item->sellPrice, item->damage, item->critChance, item->range,
-                item->description);
         item = &items[++i];
     }
 
