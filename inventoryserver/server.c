@@ -251,7 +251,9 @@ void *handle_database_thread(void *data){
                     sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
 
                     // marshal directly into string:
-                    INIT_QUEUE_HEAD(response, marshalItems(stmt), NULL);
+                    char * result = marshalItems(stmt);
+                    INIT_QUEUE_HEAD(response, result, NULL);
+                    free(result); // INIT_QUEUE_HEAD does a strdup
 
                     sqlite3_finalize(stmt);
                 } else {
