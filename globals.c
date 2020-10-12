@@ -41,9 +41,11 @@ char* serialize_item(Item *item, char* result){
 
 void deserialize_item(char *buf, Item *item) {
     item->name = malloc(sizeof(char) * 256);
+    bzero(item->name, 256);
     item->description = malloc(sizeof(char)*256);
+    bzero(item->description, 256);
 
-    sscanf(buf, "%d\n%[^\n]\n%d\n%d\n%d\n%d\n%d\n%lf\n%d\n%[^\x1e]%c",
+    sscanf(buf, "%d\n%[^\n]\n%d\n%d\n%d\n%d\n%d\n%lf\n%d\n%[^\x1e]",
            &item->id,
            item->name,
            &item->armor,
@@ -53,7 +55,6 @@ void deserialize_item(char *buf, Item *item) {
            &item->damage,
            &item->critChance,
            &item->range,
-           item->description,
-           NULL
+           item->description
     );
 }
