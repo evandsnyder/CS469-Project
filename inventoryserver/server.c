@@ -314,7 +314,6 @@ void *handle_database_thread(void *data){
                     item.id = sqlite3_last_insert_rowid(db);
                     // success
                     sprintf(request_data, "SUCCESS\n%d", item.id);
-                    // TODO: memory leak?
                     INIT_QUEUE_HEAD(response, strdup(request_data), NULL);
                 }
                 else {

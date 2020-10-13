@@ -21,21 +21,12 @@ struct editItemWidget{
     GtkSpinButton *itemCrit;
     GtkSpinButton *itemRange;
 
-    GtkAdjustment* armorAdjustment;
-    GtkAdjustment* priceAdjustment;
-    GtkAdjustment* manaAdjustment;
-    GtkAdjustment* healthAdjustment;
-    GtkAdjustment* damageAdjustment;
-    GtkAdjustment* critAdjustment;
-    GtkAdjustment* rangeAdjustment;
-
 };
 
 GtkWidget* createButton;
 GtkWidget* modifyButton;
 GtkWidget* deleteButton;
 GtkWidget* mainWindow;
-GtkWidget* listBox;
 GtkWidget* editItemDialogWidget;
 GtkListStore* itemListStore;
 GtkBuilder *builder;
@@ -59,6 +50,23 @@ enum ItemInfo {
     DESCRIPTION
 };
 
+gboolean displayConfirmationDialog(GtkWidget *widget, char* msg){
+    GtkWidget *confirmDialog = gtk_message_dialog_new(GTK_WINDOW(widget),
+            GTK_DIALOG_MODAL | GTK_DIALOG_DESTROY_WITH_PARENT,
+            GTK_MESSAGE_QUESTION, GTK_BUTTONS_YES_NO,"%s", msg);
+
+    int result = gtk_dialog_run(GTK_DIALOG(confirmDialog));
+    gtk_widget_destroy(confirmDialog);
+
+    switch(result){
+        case GTK_RESPONSE_YES:
+            return TRUE;
+        case GTK_RESPONSE_NO:
+        default:
+            return FALSE;
+    }
+}
+
 
 gboolean onWidgetDelete(GtkWidget *widget, GdkEvent *event, gpointer data){
     gtk_widget_hide(widget);
@@ -66,20 +74,88 @@ gboolean onWidgetDelete(GtkWidget *widget, GdkEvent *event, gpointer data){
 }
 
 void cancelItemEdit(GtkWidget* widget, gpointer data){
-    printf("Canceled!\n");
+    // Should we check for unsaved changes?
     gtk_widget_hide(GTK_WIDGET(data));
 }
 
 void saveItemEdit(GtkWidget* widget, gpointer data){
-    printf("Saved!\n");
     gtk_widget_hide(GTK_WIDGET(data));
 
     // Get data from all relevant fields
     Item *item = (Item*)malloc(sizeof(Item));
     item->name = (char*)malloc(sizeof(char)*BUFFER_SIZE);
+    bzero(item->name, BUFFER_SIZE);
     item->description = (char*)malloc(sizeof(char)*BUFFER_SIZE);
+    bzero(item->description, BUFFER_SIZE);
 
-    // gtk_label_get_text();
+    item->id = atoi(gtk_label_get_text(itemEditor->itemId));
+    item->name = (char*)gtk_entry_get_text(itemEditor->itemName);
+    item->armor = (int)gtk_spin_button_get_value(itemEditor->itemArmor);
+    item->health = (int)gtk_spin_button_get_value(itemEditor->itemHealth);
+    item->mana = (int)gtk_spin_button_get_value(itemEditor->itemMana);
+    item->sellPrice = (int)gtk_spin_button_get_value(itemEditor->itemPrice);
+    item->damage = (int)gtk_spin_button_get_value(itemEditor->itemDamage);
+    item->critChance = gtk_spin_button_get_value(itemEditor->itemCrit);
+    item->range = (int)gtk_spin_button_get_value(itemEditor->itemRange);
+    item->description = (char*)gtk_entry_get_text(itemEditor->itemDescription);
+
+    char* serialized_item = NULL;
+    serialized_item = serialize_item(item, serialized_item);
+    
+    char* msg = (char*)calloc(sizeof(char), strlen(serialized_item) + 4);
+    if(item->id == -1){
+        strncat(msg, "PUT ", 4);
+    } else {
+        strncat(msg, "MOD ", 4);
+    }
+
+    strcat(msg, serialized_item);
+    if(SSL_write(ssl, msg, strlen(msg)) < 0){
+        display_error_dialog("Error communicating with server");
+    }
+
+    free(msg);
+    free(serialized_item);
+
+    char response[BUFFER_SIZE] = {0};
+    SSL_read(ssl, response, BUFFER_SIZE);
+    if(strcmp(response, "FAILURE") == 0){
+        display_error_dialog("Unable to add to database");
+    }else{
+        // Reload all items
+    }
+}
+
+void deleteItemHandler(GtkWidget* widget, gpointer user_data){
+
+    int id = -1;
+    if(gtk_tree_selection_get_selected(selection, &itemModel, &selectedIter)) {
+        gtk_tree_model_get(itemModel, &selectedIter,
+                           ID, &id, -1);
+    }
+
+    char* msg1 = (char*)malloc(sizeof(char)*BUFFER_SIZE);
+    sprintf(msg1, "Are you sure you want to delete this item? (ID: %d)", id);
+
+    if(displayConfirmationDialog(GTK_WIDGET(user_data), msg1) == FALSE){
+        fprintf(stdout, "Not Deleting\n");
+    } else {
+        fprintf(stdout, "Deleting\n");
+    }
+
+    char msg[BUFFER_SIZE];
+    sprintf(msg, "DEL %d", id);
+    if(SSL_write(ssl, msg, strlen(msg)) < 0){
+        display_error_dialog("Error communicating with server");
+    }
+
+    char response[BUFFER_SIZE] = {0};
+    SSL_read(ssl, response, BUFFER_SIZE);
+    if(strcmp(response, "FAILURE") == 0){
+        display_error_dialog("Could not delete item from database");
+    } else {
+        // reload all items
+    }
 }
 
 void openItemEditor(Item *item){
@@ -217,6 +293,8 @@ Item * get_all_items_from_database(){
         token = strtok(NULL, str2);
     }
 
+    free(token);
+
     return items;
 }
 
@@ -237,7 +315,6 @@ void create_main_ui(){
     createButton = GTK_WIDGET(gtk_builder_get_object(builder, "createButton"));
     modifyButton = GTK_WIDGET(gtk_builder_get_object(builder, "modifyButton"));
     deleteButton = GTK_WIDGET(gtk_builder_get_object(builder, "deleteButton"));
-    listBox = GTK_WIDGET(gtk_builder_get_object(builder, "listBox"));
     itemListStore = GTK_LIST_STORE(gtk_builder_get_object(builder, "itemListStore"));
     itemTreeView = GTK_TREE_VIEW(gtk_builder_get_object(builder, "itemTreeView"));
     editItemDialogWidget = GTK_WIDGET(gtk_builder_get_object(builder, "editItemDialog"));
@@ -254,13 +331,6 @@ void create_main_ui(){
     itemEditor->itemDamage = GTK_SPIN_BUTTON(gtk_builder_get_object(builder, "itemDamage"));
     itemEditor->itemCrit = GTK_SPIN_BUTTON(gtk_builder_get_object(builder, "itemCrit"));
     itemEditor->itemRange = GTK_SPIN_BUTTON(gtk_builder_get_object(builder, "itemRange"));
-    itemEditor->armorAdjustment = GTK_ADJUSTMENT(gtk_builder_get_object(builder, "armorAdjustment"));
-    itemEditor->priceAdjustment = GTK_ADJUSTMENT(gtk_builder_get_object(builder, "priceAdjustment"));
-    itemEditor->manaAdjustment = GTK_ADJUSTMENT(gtk_builder_get_object(builder, "manaAdjustment"));
-    itemEditor->healthAdjustment = GTK_ADJUSTMENT(gtk_builder_get_object(builder, "healthAdjustment"));
-    itemEditor->damageAdjustment = GTK_ADJUSTMENT(gtk_builder_get_object(builder, "damageAdjustment"));
-    itemEditor->critAdjustment = GTK_ADJUSTMENT(gtk_builder_get_object(builder, "critAdjustment"));
-    itemEditor->rangeAdjustment = GTK_ADJUSTMENT(gtk_builder_get_object(builder, "rangeAdjustment"));
 
     g_signal_connect(itemEditor->editItemCancelButton, "clicked", G_CALLBACK(cancelItemEdit), editItemDialogWidget);
     g_signal_connect(itemEditor->editItemSaveButton, "clicked", G_CALLBACK(saveItemEdit), editItemDialogWidget);
@@ -299,6 +369,7 @@ void create_main_ui(){
 
     g_signal_connect(modifyButton, "clicked", G_CALLBACK(editItemDialog), NULL);
     g_signal_connect(createButton, "clicked", G_CALLBACK(newItemDialog), NULL);
+    g_signal_connect(deleteButton, "clicked", G_CALLBACK(deleteItemHandler), G_OBJECT(mainWindow));
 
 
     gtk_widget_show(mainWindow);
