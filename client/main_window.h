@@ -9,6 +9,7 @@
 #include "../globals.h"
 
 void create_main_ui();
+void display_error_dialog(char* msg);
 Item * get_all_items_from_database();
 
 #endif //CS469_PROJECT_MAIN_WINDOW_H

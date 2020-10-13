@@ -5,17 +5,46 @@
 #include "main_window.h"
 #include "network.h"
 
+
+
+struct editItemWidget{
+    GtkWidget *editItemSaveButton;
+    GtkWidget *editItemCancelButton;
+    GtkLabel *itemId;
+    GtkEntry *itemName;
+    GtkEntry *itemDescription;
+    GtkSpinButton *itemArmor;
+    GtkSpinButton *itemPrice;
+    GtkSpinButton *itemMana;
+    GtkSpinButton *itemHealth;
+    GtkSpinButton *itemDamage;
+    GtkSpinButton *itemCrit;
+    GtkSpinButton *itemRange;
+
+    GtkAdjustment* armorAdjustment;
+    GtkAdjustment* priceAdjustment;
+    GtkAdjustment* manaAdjustment;
+    GtkAdjustment* healthAdjustment;
+    GtkAdjustment* damageAdjustment;
+    GtkAdjustment* critAdjustment;
+    GtkAdjustment* rangeAdjustment;
+
+};
+
 GtkWidget* createButton;
 GtkWidget* modifyButton;
 GtkWidget* deleteButton;
 GtkWidget* mainWindow;
 GtkWidget* listBox;
+GtkWidget* editItemDialogWidget;
 GtkListStore* itemListStore;
 GtkBuilder *builder;
 GtkTreeView* itemTreeView;
 GtkTreeSelection *selection;
 GtkTreeIter selectedIter;
 GtkTreeModel *itemModel;
+struct editItemWidget *itemEditor;
+
 
 enum ItemInfo {
     ID = 0,
@@ -30,31 +59,100 @@ enum ItemInfo {
     DESCRIPTION
 };
 
+
+gboolean onWidgetDelete(GtkWidget *widget, GdkEvent *event, gpointer data){
+    gtk_widget_hide(widget);
+    return TRUE;
+}
+
+void cancelItemEdit(GtkWidget* widget, gpointer data){
+    printf("Canceled!\n");
+    gtk_widget_hide(GTK_WIDGET(data));
+}
+
+void saveItemEdit(GtkWidget* widget, gpointer data){
+    printf("Saved!\n");
+    gtk_widget_hide(GTK_WIDGET(data));
+
+    // Get data from all relevant fields
+    Item *item = (Item*)malloc(sizeof(Item));
+    item->name = (char*)malloc(sizeof(char)*BUFFER_SIZE);
+    item->description = (char*)malloc(sizeof(char)*BUFFER_SIZE);
+
+    // gtk_label_get_text();
+}
+
 void openItemEditor(Item *item){
 
-    if(item != NULL){
-        printf("EDITING ITEM\n");
-    }
+    char t[BUFFER_SIZE] = {0};
+    sprintf(t, "%d", item->id);
+
+    gtk_label_set_text(itemEditor->itemId, t);
+    gtk_entry_set_text(itemEditor->itemName, item->name);
+    gtk_spin_button_set_value(itemEditor->itemArmor, item->armor);
+    gtk_spin_button_set_value(itemEditor->itemHealth, item->health);
+    gtk_spin_button_set_value(itemEditor->itemMana, item->mana);
+    gtk_spin_button_set_value(itemEditor->itemPrice, item->sellPrice);
+    gtk_spin_button_set_value(itemEditor->itemDamage, item->damage);
+    gtk_spin_button_set_value(itemEditor->itemCrit, item->critChance);
+    gtk_spin_button_set_value(itemEditor->itemRange, item->range);
+    gtk_entry_set_text(itemEditor->itemDescription, item->description);
+
+    gtk_widget_show(editItemDialogWidget);
 
 }
 
 G_MODULE_EXPORT void editItemDialog(gpointer user_data){
-    gchar* data;
+    Item *item = (Item*)malloc(sizeof(Item));
+    item->name = (char*)malloc(sizeof(char)*BUFFER_SIZE);
+    bzero(item->name, BUFFER_SIZE);
+    item->description = (char*)malloc(sizeof(char)*BUFFER_SIZE);
+    bzero(item->description, BUFFER_SIZE);
+
     // Get selected Item
     if(gtk_tree_selection_get_selected(selection, &itemModel, &selectedIter)){
-        gtk_tree_model_get(itemModel, &selectedIter, NAME, &data, -1);
-        g_print("CURRENT ITEM: %s\n", data);
-        g_free(data);
+        gtk_tree_model_get(itemModel, &selectedIter,
+                ID, &item->id,
+                NAME, &item->name,
+                ARMOR, &item->armor,
+                HEALTH, &item->health,
+                MANA, &item->mana,
+                SELL_PRICE, &item->sellPrice,
+                DAMAGE, &item->damage,
+                CRIT_CHANCE, &item->critChance,
+                RANGE, &item->range,
+                DESCRIPTION, &item->description,
+                -1);
+    }
+
+    if(item->name == NULL){
+        display_error_dialog("Could not load item for editing");
+    } else {
+        fprintf(stdout, "Selected Item: %s: %s\n", item->name, item->description);
     }
 
     // Craft the Item
-    Item* item;
     openItemEditor(item);
 }
 
 G_MODULE_EXPORT void newItemDialog(gpointer data){
     fprintf(stdout, "Creating new item\n");
-     openItemEditor(NULL);
+
+    Item *item = (Item*)malloc(sizeof(Item));
+    item->name = (char*)malloc(sizeof(char)*BUFFER_SIZE);
+    item->description = (char*)malloc(sizeof(char)*BUFFER_SIZE);
+    item->id = -1;
+    item->name = "\0";
+    item->description = "\0";
+    item->armor = 0;
+    item->health = 0;
+    item->mana = 0;
+    item->sellPrice = 0;
+    item->damage = 0;
+    item->critChance = 0.0;
+    item->range = 0;
+
+     openItemEditor(item);
 }
 
 void display_error_dialog(char* msg){
@@ -133,6 +231,8 @@ void create_main_ui(){
         exit(-1);
     }
 
+    itemEditor = (struct editItemWidget*)malloc(sizeof(struct editItemWidget));
+
     mainWindow = GTK_WIDGET(gtk_builder_get_object(builder, "mainWindow"));
     createButton = GTK_WIDGET(gtk_builder_get_object(builder, "createButton"));
     modifyButton = GTK_WIDGET(gtk_builder_get_object(builder, "modifyButton"));
@@ -140,6 +240,33 @@ void create_main_ui(){
     listBox = GTK_WIDGET(gtk_builder_get_object(builder, "listBox"));
     itemListStore = GTK_LIST_STORE(gtk_builder_get_object(builder, "itemListStore"));
     itemTreeView = GTK_TREE_VIEW(gtk_builder_get_object(builder, "itemTreeView"));
+    editItemDialogWidget = GTK_WIDGET(gtk_builder_get_object(builder, "editItemDialog"));
+
+    itemEditor->editItemSaveButton = GTK_WIDGET(gtk_builder_get_object(builder, "editItemSaveButton"));
+    itemEditor->editItemCancelButton = GTK_WIDGET(gtk_builder_get_object(builder, "editItemCancelButton"));
+    itemEditor->itemId = GTK_LABEL(gtk_builder_get_object(builder, "itemId"));
+    itemEditor->itemName = GTK_ENTRY(gtk_builder_get_object(builder, "itemName"));
+    itemEditor->itemDescription = GTK_ENTRY(gtk_builder_get_object(builder, "itemDescription"));
+    itemEditor->itemArmor = GTK_SPIN_BUTTON(gtk_builder_get_object(builder, "itemArmor"));
+    itemEditor->itemPrice = GTK_SPIN_BUTTON(gtk_builder_get_object(builder, "itemPrice"));
+    itemEditor->itemMana = GTK_SPIN_BUTTON(gtk_builder_get_object(builder, "itemMana"));
+    itemEditor->itemHealth = GTK_SPIN_BUTTON(gtk_builder_get_object(builder, "itemHealth"));
+    itemEditor->itemDamage = GTK_SPIN_BUTTON(gtk_builder_get_object(builder, "itemDamage"));
+    itemEditor->itemCrit = GTK_SPIN_BUTTON(gtk_builder_get_object(builder, "itemCrit"));
+    itemEditor->itemRange = GTK_SPIN_BUTTON(gtk_builder_get_object(builder, "itemRange"));
+    itemEditor->armorAdjustment = GTK_ADJUSTMENT(gtk_builder_get_object(builder, "armorAdjustment"));
+    itemEditor->priceAdjustment = GTK_ADJUSTMENT(gtk_builder_get_object(builder, "priceAdjustment"));
+    itemEditor->manaAdjustment = GTK_ADJUSTMENT(gtk_builder_get_object(builder, "manaAdjustment"));
+    itemEditor->healthAdjustment = GTK_ADJUSTMENT(gtk_builder_get_object(builder, "healthAdjustment"));
+    itemEditor->damageAdjustment = GTK_ADJUSTMENT(gtk_builder_get_object(builder, "damageAdjustment"));
+    itemEditor->critAdjustment = GTK_ADJUSTMENT(gtk_builder_get_object(builder, "critAdjustment"));
+    itemEditor->rangeAdjustment = GTK_ADJUSTMENT(gtk_builder_get_object(builder, "rangeAdjustment"));
+
+    g_signal_connect(itemEditor->editItemCancelButton, "clicked", G_CALLBACK(cancelItemEdit), editItemDialogWidget);
+    g_signal_connect(itemEditor->editItemSaveButton, "clicked", G_CALLBACK(saveItemEdit), editItemDialogWidget);
+    g_signal_connect(editItemDialogWidget, "delete-event", G_CALLBACK(onWidgetDelete), NULL);
+
+    gtk_window_set_transient_for(GTK_WINDOW(editItemDialogWidget), GTK_WINDOW(mainWindow));
 
     gtk_builder_connect_signals(builder, NULL);
     g_object_unref(G_OBJECT(builder));
