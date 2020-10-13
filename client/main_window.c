@@ -101,7 +101,7 @@ void saveItemEdit(GtkWidget* widget, gpointer data){
 
     char* serialized_item = NULL;
     serialized_item = serialize_item(item, serialized_item);
-    
+
     char* msg = (char*)calloc(sizeof(char), strlen(serialized_item) + 4);
     if(item->id == -1){
         strncat(msg, "PUT ", 4);
@@ -116,13 +116,14 @@ void saveItemEdit(GtkWidget* widget, gpointer data){
 
     free(msg);
     free(serialized_item);
+    freeItem(item);
 
     char response[BUFFER_SIZE] = {0};
     SSL_read(ssl, response, BUFFER_SIZE);
     if(strcmp(response, "FAILURE") == 0){
         display_error_dialog("Unable to add to database");
     }else{
-        // Reload all items
+        get_all_items_from_database();
     }
 }
 
@@ -138,10 +139,9 @@ void deleteItemHandler(GtkWidget* widget, gpointer user_data){
     sprintf(msg1, "Are you sure you want to delete this item? (ID: %d)", id);
 
     if(displayConfirmationDialog(GTK_WIDGET(user_data), msg1) == FALSE){
-        fprintf(stdout, "Not Deleting\n");
-    } else {
-        fprintf(stdout, "Deleting\n");
+        return;
     }
+    free(msg1);
 
     char msg[BUFFER_SIZE];
     sprintf(msg, "DEL %d", id);
@@ -154,7 +154,7 @@ void deleteItemHandler(GtkWidget* widget, gpointer user_data){
     if(strcmp(response, "FAILURE") == 0){
         display_error_dialog("Could not delete item from database");
     } else {
-        // reload all items
+        get_all_items_from_database();
     }
 }
 
@@ -173,6 +173,8 @@ void openItemEditor(Item *item){
     gtk_spin_button_set_value(itemEditor->itemCrit, item->critChance);
     gtk_spin_button_set_value(itemEditor->itemRange, item->range);
     gtk_entry_set_text(itemEditor->itemDescription, item->description);
+
+    freeItem(item);
 
     gtk_widget_show(editItemDialogWidget);
 
@@ -203,8 +205,6 @@ G_MODULE_EXPORT void editItemDialog(gpointer user_data){
 
     if(item->name == NULL){
         display_error_dialog("Could not load item for editing");
-    } else {
-        fprintf(stdout, "Selected Item: %s: %s\n", item->name, item->description);
     }
 
     // Craft the Item
@@ -212,14 +212,13 @@ G_MODULE_EXPORT void editItemDialog(gpointer user_data){
 }
 
 G_MODULE_EXPORT void newItemDialog(gpointer data){
-    fprintf(stdout, "Creating new item\n");
 
     Item *item = (Item*)malloc(sizeof(Item));
     item->name = (char*)malloc(sizeof(char)*BUFFER_SIZE);
+    bzero(item->name, BUFFER_SIZE);
     item->description = (char*)malloc(sizeof(char)*BUFFER_SIZE);
+    bzero(item->description, BUFFER_SIZE);
     item->id = -1;
-    item->name = "\0";
-    item->description = "\0";
     item->armor = 0;
     item->health = 0;
     item->mana = 0;
@@ -228,7 +227,7 @@ G_MODULE_EXPORT void newItemDialog(gpointer data){
     item->critChance = 0.0;
     item->range = 0;
 
-     openItemEditor(item);
+    openItemEditor(item);
 }
 
 void display_error_dialog(char* msg){
@@ -238,7 +237,7 @@ void display_error_dialog(char* msg){
     gtk_widget_destroy(dialog);
 }
 
-Item * get_all_items_from_database(){
+void get_all_items_from_database(){
     // One extra char to guarantee null-termination
     char buffer[BUFFER_SIZE + 1] = {0};
     sprintf(buffer, "GET ALL");
@@ -248,7 +247,7 @@ Item * get_all_items_from_database(){
     SSL_read(ssl, buffer, BUFFER_SIZE);
     if(strcmp("FAILURE", buffer) == 0){
         display_error_dialog("Could not Retrieve items from database");
-        return NULL;
+        return;
     }
 
     size_t mem_size = 1024*4;
@@ -280,7 +279,7 @@ Item * get_all_items_from_database(){
     // Need to tokenize now...
     char* token;
     char str2[] = {RECORD_SEPARATOR, '\0'};
-    Item *items = (Item*)malloc(sizeof(Item)*MAX_ITEMS);
+    Item *items[MAX_ITEMS];
     bzero(items, MAX_ITEMS);
     Item *newItem;
     int available = 0;
@@ -289,13 +288,33 @@ Item * get_all_items_from_database(){
     while(token != NULL){
         newItem = (Item*)malloc(sizeof(Item));
         deserialize_item(token, newItem);
-        items[available++] = *newItem;
+        items[available++] = newItem;
         token = strtok(NULL, str2);
     }
 
     free(token);
+    allItems -=8; // Must account for the removed bytes
+    free(allItems);
 
-    return items;
+    gtk_list_store_clear(itemListStore);
+
+    for(int i = 0; i < available; i++){
+        GtkTreeIter iter;
+        gtk_list_store_append(itemListStore, &iter);
+        gtk_list_store_set(itemListStore, &iter,
+                ID, items[i]->id,
+                NAME, items[i]->name,
+                ARMOR, items[i]->armor,
+                HEALTH, items[i]->health,
+                MANA, items[i]->mana,
+                SELL_PRICE, items[i]->sellPrice,
+                DAMAGE, items[i]->damage,
+                CRIT_CHANCE, items[i]->critChance,
+                RANGE, items[i]->range,
+                DESCRIPTION, items[i]->description,
+                -1);
+        freeItem(items[i]);
+    }
 }
 
 void create_main_ui(){
@@ -341,35 +360,14 @@ void create_main_ui(){
     gtk_builder_connect_signals(builder, NULL);
     g_object_unref(G_OBJECT(builder));
 
-    Item* items = get_all_items_from_database();
-
-    int i  = 0;
-    Item* item = &items[i];
-    while(item->name != NULL){
-        GtkTreeIter iter;
-        gtk_list_store_append(itemListStore, &iter);
-        gtk_list_store_set(itemListStore, &iter,
-                ID, item->id,
-                NAME, item->name,
-                ARMOR, item->armor,
-                HEALTH, item->health,
-                MANA, item->mana,
-                SELL_PRICE, item->sellPrice,
-                DAMAGE, item->damage,
-                CRIT_CHANCE, item->critChance,
-                RANGE, item->range,
-                DESCRIPTION, item->description,
-                -1);
-        item = &items[++i];
-    }
-
-
     selection = gtk_tree_view_get_selection(itemTreeView);
     gtk_tree_selection_set_mode(selection, GTK_SELECTION_SINGLE);
 
     g_signal_connect(modifyButton, "clicked", G_CALLBACK(editItemDialog), NULL);
     g_signal_connect(createButton, "clicked", G_CALLBACK(newItemDialog), NULL);
     g_signal_connect(deleteButton, "clicked", G_CALLBACK(deleteItemHandler), G_OBJECT(mainWindow));
+
+    get_all_items_from_database();
 
 
     gtk_widget_show(mainWindow);

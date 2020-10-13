@@ -210,7 +210,7 @@ void *handle_database_thread(void *data){
     // Check that the database has the correct schema. Doesn't check column names
     retCode = sqlite3_step(stmt);
     while(retCode != SQLITE_DONE){
-        const char *table = sqlite3_column_text(stmt, 0);
+        const char *table = (const char *)sqlite3_column_text(stmt, 0);
         if(strcmp(table, "items") != 0 && strcmp(table, "users") != 0){
             fprintf(stderr, "Database: Invalid schema. Missing user or items table");
             sqlite3_close(db);
@@ -247,7 +247,6 @@ void *handle_database_thread(void *data){
                 // GET all items
                 if (strcmp(request_data, "ALL") == 0) {
                     const char *sql = "SELECT * FROM items";
-                    sqlite3_stmt *stmt;
                     sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
 
                     // marshal directly into string:
@@ -260,7 +259,6 @@ void *handle_database_thread(void *data){
                     int id = atoi(request_data);
 
                     const char *sql = "SELECT * FROM items WHERE id=?";
-                    sqlite3_stmt *stmt;
                     sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
                     sqlite3_bind_int(stmt, 1, id);
 
@@ -272,7 +270,7 @@ void *handle_database_thread(void *data){
                         new_item_from_row(stmt, &item);
                         // item found: serialize it into response
 
-                        char* itemInfo;
+                        char* itemInfo = NULL;
                         itemInfo = serialize_item(&item, itemInfo);
 
                         char* responseString;
@@ -297,7 +295,6 @@ void *handle_database_thread(void *data){
                     "(name, armorPoints, healthPoints, manaPoints, sellPrice,"
                     " damage, critChance, range, description) "
                     "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
-                sqlite3_stmt * stmt;
                 sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
                 sqlite3_bind_text(stmt, 1, item.name, strlen(item.name), NULL);
                 sqlite3_bind_int(stmt, 2, item.armor);
@@ -332,7 +329,6 @@ void *handle_database_thread(void *data){
                     "name=?, armorPoints=?, healthPoints=?, manaPoints=?, "
                     "sellPrice=?, damage=?, critChance=?, range=?, description=? "
                     "WHERE id=?";
-                sqlite3_stmt * stmt;
                 sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
                 sqlite3_bind_text(stmt, 1, item.name, strlen(item.name), NULL);
                 sqlite3_bind_int(stmt, 2, item.armor);
@@ -363,7 +359,6 @@ void *handle_database_thread(void *data){
                 int id = atoi(request_data);
 
                 const char * sql = "DELETE FROM items WHERE id=?";
-                sqlite3_stmt * stmt;
                 sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
                 sqlite3_bind_int(stmt, 1, id);
 
@@ -445,8 +440,7 @@ void *handle_database_thread(void *data){
                         break;
                     SSL_shutdown(ssl);
                     // get success response back
-                    rcount = 1;
-                    while ((rcount = SSL_read(ssl, buffer, BUFFER_SIZE)) > 0)
+                    while (SSL_read(ssl, buffer, BUFFER_SIZE) > 0)
                         ;
 
                     if (strncmp(buffer, "SUCCESS", strlen("SUCCESS")) != 0)
@@ -860,7 +854,7 @@ char * marshalItems(sqlite3_stmt *stmt){
     bzero(result, sizeof(char)*mem_size);
     strncat(result, "SUCCESS ", 9);
 
-    int r = SQLITE_OK;
+    int r;
     r = sqlite3_step(stmt);
     while(r == SQLITE_ROW ){
         char* curItem;
@@ -877,8 +871,6 @@ char * marshalItems(sqlite3_stmt *stmt){
                  (const char*)sqlite3_column_text(stmt, 9),
                  RECORD_SEPARATOR
          );
-
-        fprintf(stdout, "\n%s\n", curItem);
 
         // Need to append
         if(strlen(curItem) + strlen(result) >= cur_size){ // Amount of data is too large, we need to add more memory
