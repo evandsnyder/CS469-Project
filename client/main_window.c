@@ -188,9 +188,7 @@ void openItemEditor(Item *item){
 
 G_MODULE_EXPORT void editItemDialog(gpointer user_data){
     Item *item = (Item*)malloc(sizeof(Item));
-    // item->name = (char*)malloc(sizeof(char)*BUFFER_SIZE);
     bzero(item->name, BUFFER_SIZE);
-    // item->description = (char*)malloc(sizeof(char)*BUFFER_SIZE);
     bzero(item->description, BUFFER_SIZE);
 
     gchar* name = (gchar*)malloc(sizeof(char)*BUFFER_SIZE);
@@ -230,9 +228,7 @@ G_MODULE_EXPORT void editItemDialog(gpointer user_data){
 G_MODULE_EXPORT void newItemDialog(gpointer data){
 
     Item *item = (Item*)malloc(sizeof(Item));
-    // item->name = (char*)malloc(sizeof(char)*BUFFER_SIZE);
     bzero(item->name, BUFFER_SIZE);
-    // item->description = (char*)malloc(sizeof(char)*BUFFER_SIZE);
     bzero(item->description, BUFFER_SIZE);
     item->id = -1;
     item->armor = 0;
@@ -333,7 +329,9 @@ void get_all_items_from_database(){
         freeItem(items[i]);
     }
 
-    // gtk_tree_view_set_cursor(itemTreeView, 0, NULL, FALSE);
+    GtkTreeIter iter;
+    gtk_tree_model_get_iter_first(itemModel, &iter);
+    gtk_tree_selection_select_iter(selection, &iter);
 }
 
 void create_main_ui(){
@@ -369,6 +367,8 @@ void create_main_ui(){
     itemEditor->itemDamage = GTK_SPIN_BUTTON(gtk_builder_get_object(builder, "itemDamage"));
     itemEditor->itemCrit = GTK_SPIN_BUTTON(gtk_builder_get_object(builder, "itemCrit"));
     itemEditor->itemRange = GTK_SPIN_BUTTON(gtk_builder_get_object(builder, "itemRange"));
+
+    itemModel = gtk_tree_view_get_model(itemTreeView);
 
     g_signal_connect(itemEditor->editItemCancelButton, "clicked", G_CALLBACK(cancelItemEdit), editItemDialogWidget);
     g_signal_connect(itemEditor->editItemSaveButton, "clicked", G_CALLBACK(saveItemEdit), editItemDialogWidget);
