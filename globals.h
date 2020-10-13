@@ -30,7 +30,7 @@
 
 typedef struct {
     int id;
-    char *name;
+    char name[BUFFER_SIZE];
     int armor;
     int health;
     int mana;
@@ -38,7 +38,7 @@ typedef struct {
     int damage;
     double critChance;
     int range;
-    char *description;
+    char description[BUFFER_SIZE];
 } Item;
 
 void *malloc_aligned(unsigned int size);

@@ -891,7 +891,8 @@ char * marshalItems(sqlite3_stmt *stmt){
 
 void new_item_from_row(sqlite3_stmt * stmt, Item * item) {
     item->id = sqlite3_column_int(stmt, 0);
-    item->name = strdup((const char*)sqlite3_column_text(stmt, 1));
+    snprintf(item->name, BUFFER_SIZE, "%s", (const char*)sqlite3_column_text(stmt, 1));
+    // item->name = strdup((const char*)sqlite3_column_text(stmt, 1));
     item->armor = sqlite3_column_int(stmt, 2);
     item->health = sqlite3_column_int(stmt, 3);
     item->mana = sqlite3_column_int(stmt, 4); // mana
@@ -899,5 +900,6 @@ void new_item_from_row(sqlite3_stmt * stmt, Item * item) {
     item->damage = sqlite3_column_int(stmt, 6);
     item->critChance = sqlite3_column_double(stmt, 7);
     item->range = sqlite3_column_int(stmt, 8); // range
-    item->description = strdup((const char*)sqlite3_column_text(stmt, 9));
+    snprintf(item->description, BUFFER_SIZE, "%s", (const char*)sqlite3_column_text(stmt, 9));
+    // item->description = strdup((const char*)sqlite3_column_text(stmt, 9));
 }

@@ -18,8 +18,8 @@ void *malloc_aligned(unsigned int size){
 }
 
 void freeItem(Item* item){
-    free(item->description);
-    free(item->name);
+//    free(item->description);
+//    free(item->name);
     free(item);
 }
 
@@ -40,10 +40,10 @@ char* serialize_item(Item *item, char* result){
 }
 
 void deserialize_item(char *buf, Item *item) {
-    item->name = malloc(sizeof(char) * 256);
-    bzero(item->name, 256);
-    item->description = malloc(sizeof(char)*256);
-    bzero(item->description, 256);
+    // item->name = malloc(sizeof(char) * 256);
+    bzero(item->name, BUFFER_SIZE);
+    // item->description = malloc(sizeof(char)*256);
+    bzero(item->description, BUFFER_SIZE);
 
     sscanf(buf, "%d\n%[^\n]\n%d\n%d\n%d\n%d\n%d\n%lf\n%d\n%[^\x1e]",
            &item->id,

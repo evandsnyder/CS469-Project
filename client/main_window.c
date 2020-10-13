@@ -83,13 +83,14 @@ void saveItemEdit(GtkWidget* widget, gpointer data){
 
     // Get data from all relevant fields
     Item *item = (Item*)malloc(sizeof(Item));
-    item->name = (char*)malloc(sizeof(char)*BUFFER_SIZE);
+    // item->name = (char*)malloc(sizeof(char)*BUFFER_SIZE);
     bzero(item->name, BUFFER_SIZE);
-    item->description = (char*)malloc(sizeof(char)*BUFFER_SIZE);
+    // item->description = (char*)malloc(sizeof(char)*BUFFER_SIZE);
     bzero(item->description, BUFFER_SIZE);
 
     item->id = atoi(gtk_label_get_text(itemEditor->itemId));
-    item->name = (char*)gtk_entry_get_text(itemEditor->itemName);
+    snprintf(item->name, BUFFER_SIZE, "%s", (char*)gtk_entry_get_text(itemEditor->itemName));
+    // item->name = (char*)gtk_entry_get_text(itemEditor->itemName);
     item->armor = (int)gtk_spin_button_get_value(itemEditor->itemArmor);
     item->health = (int)gtk_spin_button_get_value(itemEditor->itemHealth);
     item->mana = (int)gtk_spin_button_get_value(itemEditor->itemMana);
@@ -97,10 +98,14 @@ void saveItemEdit(GtkWidget* widget, gpointer data){
     item->damage = (int)gtk_spin_button_get_value(itemEditor->itemDamage);
     item->critChance = gtk_spin_button_get_value(itemEditor->itemCrit);
     item->range = (int)gtk_spin_button_get_value(itemEditor->itemRange);
-    item->description = (char*)gtk_entry_get_text(itemEditor->itemDescription);
+    snprintf(item->description, BUFFER_SIZE, "%s", (char*)gtk_entry_get_text(itemEditor->itemDescription));
+    // item->description = (char*)gtk_entry_get_text(itemEditor->itemDescription);
 
     char* serialized_item = NULL;
     serialized_item = serialize_item(item, serialized_item);
+//    free(item->name);
+//    free(item->description);
+    free(item);
 
     char* msg = (char*)calloc(sizeof(char), strlen(serialized_item) + 4);
     if(item->id == -1){
@@ -116,7 +121,7 @@ void saveItemEdit(GtkWidget* widget, gpointer data){
 
     free(msg);
     free(serialized_item);
-    freeItem(item);
+    // freeItem(item);
 
     char response[BUFFER_SIZE] = {0};
     SSL_read(ssl, response, BUFFER_SIZE);
@@ -164,7 +169,8 @@ void openItemEditor(Item *item){
     sprintf(t, "%d", item->id);
 
     gtk_label_set_text(itemEditor->itemId, t);
-    gtk_entry_set_text(itemEditor->itemName, item->name);
+    sprintf(t, "%s", item->name);
+    gtk_entry_set_text(itemEditor->itemName, t);
     gtk_spin_button_set_value(itemEditor->itemArmor, item->armor);
     gtk_spin_button_set_value(itemEditor->itemHealth, item->health);
     gtk_spin_button_set_value(itemEditor->itemMana, item->mana);
@@ -182,16 +188,21 @@ void openItemEditor(Item *item){
 
 G_MODULE_EXPORT void editItemDialog(gpointer user_data){
     Item *item = (Item*)malloc(sizeof(Item));
-    item->name = (char*)malloc(sizeof(char)*BUFFER_SIZE);
+    // item->name = (char*)malloc(sizeof(char)*BUFFER_SIZE);
     bzero(item->name, BUFFER_SIZE);
-    item->description = (char*)malloc(sizeof(char)*BUFFER_SIZE);
+    // item->description = (char*)malloc(sizeof(char)*BUFFER_SIZE);
     bzero(item->description, BUFFER_SIZE);
+
+    gchar* name = (gchar*)malloc(sizeof(char)*BUFFER_SIZE);
+    bzero(name, BUFFER_SIZE);
+    gchar* desc = (gchar*)malloc(sizeof(char)*BUFFER_SIZE);
+    bzero(name, BUFFER_SIZE);
 
     // Get selected Item
     if(gtk_tree_selection_get_selected(selection, &itemModel, &selectedIter)){
         gtk_tree_model_get(itemModel, &selectedIter,
                 ID, &item->id,
-                NAME, &item->name,
+                NAME, &name,
                 ARMOR, &item->armor,
                 HEALTH, &item->health,
                 MANA, &item->mana,
@@ -199,13 +210,18 @@ G_MODULE_EXPORT void editItemDialog(gpointer user_data){
                 DAMAGE, &item->damage,
                 CRIT_CHANCE, &item->critChance,
                 RANGE, &item->range,
-                DESCRIPTION, &item->description,
+                DESCRIPTION, &desc,
                 -1);
     }
 
-    if(item->name == NULL){
+    if(name == NULL){
         display_error_dialog("Could not load item for editing");
     }
+
+    snprintf(item->name, BUFFER_SIZE, "%s", name);
+    snprintf(item->description, BUFFER_SIZE, "%s", desc);
+    g_free(name);
+    g_free(desc);
 
     // Craft the Item
     openItemEditor(item);
@@ -214,9 +230,9 @@ G_MODULE_EXPORT void editItemDialog(gpointer user_data){
 G_MODULE_EXPORT void newItemDialog(gpointer data){
 
     Item *item = (Item*)malloc(sizeof(Item));
-    item->name = (char*)malloc(sizeof(char)*BUFFER_SIZE);
+    // item->name = (char*)malloc(sizeof(char)*BUFFER_SIZE);
     bzero(item->name, BUFFER_SIZE);
-    item->description = (char*)malloc(sizeof(char)*BUFFER_SIZE);
+    // item->description = (char*)malloc(sizeof(char)*BUFFER_SIZE);
     bzero(item->description, BUFFER_SIZE);
     item->id = -1;
     item->armor = 0;
@@ -298,6 +314,7 @@ void get_all_items_from_database(){
 
     gtk_list_store_clear(itemListStore);
 
+
     for(int i = 0; i < available; i++){
         GtkTreeIter iter;
         gtk_list_store_append(itemListStore, &iter);
@@ -315,6 +332,8 @@ void get_all_items_from_database(){
                 -1);
         freeItem(items[i]);
     }
+
+    // gtk_tree_view_set_cursor(itemTreeView, 0, NULL, FALSE);
 }
 
 void create_main_ui(){
