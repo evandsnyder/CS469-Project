@@ -105,7 +105,6 @@ void saveItemEdit(GtkWidget* widget, gpointer data){
     serialized_item = serialize_item(item, serialized_item);
 //    free(item->name);
 //    free(item->description);
-    free(item);
 
     char* msg = (char*)calloc(sizeof(char), strlen(serialized_item) + 4);
     if(item->id == -1){
@@ -119,6 +118,7 @@ void saveItemEdit(GtkWidget* widget, gpointer data){
         display_error_dialog("Error communicating with server");
     }
 
+    free(item);
     free(msg);
     free(serialized_item);
     // freeItem(item);
