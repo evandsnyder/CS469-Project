@@ -45,7 +45,7 @@ openssl req -newkey rsa:2048 -nodes -keyout key.pem -x509 -days 365 -out cert.pe
 The server application takes command line arguments as well as a config file to prepare the server. 
 Command line arguments may appear as:
 ```
-./server -l 4466 -s localhost -p 6644 -k key.pem -c server.conf -d items.db -i 1:H
+./server -l 4466 -s localhost -p 6644 -c server.conf -d items.db -i 1:H
 ```
 
 A Sample config file may look like:
@@ -53,10 +53,26 @@ A Sample config file may look like:
 PORT=4466
 BACKUP_SERVER=localhost
 BACKUP_PORT=6644
+BACKUP_PSK=qwertyghjkgl
 DATABASE=items.db
 INTERVAL=24:m
 ```
 
+The backup server also takes command line arguments:
+```
+./backupserver -l 6644 -c backupserver.conf
+```
+
+As well as a config file:
+```
+PORT=6644
+BACKUP_PSK=qwertyghjkgl
+```
+
+Finally, the client application can be run:
+```
+./clientApp
+```
 
 #### TODO:
 * ~~Client Login UI~~
