@@ -108,9 +108,9 @@ void saveItemEdit(GtkWidget* widget, gpointer data){
 
     char* msg = (char*)calloc(sizeof(char), strlen(serialized_item) + 5);
     if(item->id == -1){
-        strncat(msg, "PUT ", 4);
+        strncat(msg, "PUT ", 5);
     } else {
-        strncat(msg, "MOD ", 4);
+        strncat(msg, "MOD ", 5);
     }
 
     strcat(msg, serialized_item);

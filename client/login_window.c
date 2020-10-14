@@ -47,7 +47,7 @@ G_MODULE_EXPORT void login(GtkWidget *widget, gpointer arg){
     if(SSL_write(ssl, serverAddress, strlen(serverAddress)) <= 0){
         fprintf(stderr, "Error writing to server: %s\n", strerror(errno));
         // need to create popup dialog here
-        GtkWidget *dialog = gtk_message_dialog_new(loginWindow, GTK_DIALOG_DESTROY_WITH_PARENT,
+        GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(loginWindow), GTK_DIALOG_DESTROY_WITH_PARENT,
                 GTK_MESSAGE_ERROR, GTK_BUTTONS_CLOSE, "Could not connect to server");
         gtk_dialog_run(GTK_DIALOG(dialog));
         gtk_widget_destroy(dialog);
