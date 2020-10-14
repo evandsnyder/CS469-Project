@@ -106,7 +106,7 @@ void saveItemEdit(GtkWidget* widget, gpointer data){
 //    free(item->name);
 //    free(item->description);
 
-    char* msg = (char*)calloc(sizeof(char), strlen(serialized_item) + 4);
+    char* msg = (char*)calloc(sizeof(char), strlen(serialized_item) + 5);
     if(item->id == -1){
         strncat(msg, "PUT ", 4);
     } else {
