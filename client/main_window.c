@@ -6,7 +6,9 @@
 #include "network.h"
 
 
-
+/**
+ * Struct to hold all relevant widgets for the item editor
+ */
 struct editItemWidget{
     GtkWidget *editItemSaveButton;
     GtkWidget *editItemCancelButton;
@@ -36,7 +38,9 @@ GtkTreeIter selectedIter;
 GtkTreeModel *itemModel;
 struct editItemWidget *itemEditor;
 
-
+/**
+ * ENUM used for assigning columns for the treeview
+ */
 enum ItemInfo {
     ID = 0,
     NAME,
@@ -50,6 +54,12 @@ enum ItemInfo {
     DESCRIPTION
 };
 
+/**
+ * Display a yes/no dialog for user confirmation
+ * @param widget
+ * @param msg
+ * @return
+ */
 gboolean displayConfirmationDialog(GtkWidget *widget, char* msg){
     GtkWidget *confirmDialog = gtk_message_dialog_new(GTK_WINDOW(widget),
             GTK_DIALOG_MODAL | GTK_DIALOG_DESTROY_WITH_PARENT,
@@ -67,30 +77,46 @@ gboolean displayConfirmationDialog(GtkWidget *widget, char* msg){
     }
 }
 
-
+/**
+ * Widget to close edit dialog without causing issues with the destroy event
+ * @param widget
+ * @param event
+ * @param data
+ * @return
+ */
 gboolean onWidgetDelete(GtkWidget *widget, GdkEvent *event, gpointer data){
     gtk_widget_hide(widget);
     return TRUE;
 }
 
+/**
+ * Signal handler for pressing cancel button in the item editor
+ * @param widget
+ * @param data
+ */
 void cancelItemEdit(GtkWidget* widget, gpointer data){
-    // Should we check for unsaved changes?
     gtk_widget_hide(GTK_WIDGET(data));
 }
 
+/**
+ * Signal handler for pressing the save button in the item editor
+ *
+ * This will either create a PUT or a MOD request depending on if
+ * we are editing an item or creating a new one.
+ *
+ * @param widget
+ * @param data
+ */
 void saveItemEdit(GtkWidget* widget, gpointer data){
     gtk_widget_hide(GTK_WIDGET(data));
 
     // Get data from all relevant fields
     Item *item = (Item*)malloc(sizeof(Item));
-    // item->name = (char*)malloc(sizeof(char)*BUFFER_SIZE);
     bzero(item->name, BUFFER_SIZE);
-    // item->description = (char*)malloc(sizeof(char)*BUFFER_SIZE);
     bzero(item->description, BUFFER_SIZE);
 
     item->id = atoi(gtk_label_get_text(itemEditor->itemId));
     snprintf(item->name, BUFFER_SIZE, "%s", (char*)gtk_entry_get_text(itemEditor->itemName));
-    // item->name = (char*)gtk_entry_get_text(itemEditor->itemName);
     item->armor = (int)gtk_spin_button_get_value(itemEditor->itemArmor);
     item->health = (int)gtk_spin_button_get_value(itemEditor->itemHealth);
     item->mana = (int)gtk_spin_button_get_value(itemEditor->itemMana);
@@ -99,12 +125,9 @@ void saveItemEdit(GtkWidget* widget, gpointer data){
     item->critChance = gtk_spin_button_get_value(itemEditor->itemCrit);
     item->range = (int)gtk_spin_button_get_value(itemEditor->itemRange);
     snprintf(item->description, BUFFER_SIZE, "%s", (char*)gtk_entry_get_text(itemEditor->itemDescription));
-    // item->description = (char*)gtk_entry_get_text(itemEditor->itemDescription);
 
     char* serialized_item = NULL;
     serialized_item = serialize_item(item, serialized_item);
-//    free(item->name);
-//    free(item->description);
 
     char* msg = (char*)calloc(sizeof(char), strlen(serialized_item) + 5);
     if(item->id == -1){
@@ -121,7 +144,6 @@ void saveItemEdit(GtkWidget* widget, gpointer data){
     free(item);
     free(msg);
     free(serialized_item);
-    // freeItem(item);
 
     char response[BUFFER_SIZE] = {0};
     SSL_read(ssl, response, BUFFER_SIZE);
@@ -132,6 +154,12 @@ void saveItemEdit(GtkWidget* widget, gpointer data){
     }
 }
 
+/**
+ * Creates a delete request for the currently selected item.
+ * Will display a confirmation dialog to ensure user decision
+ * @param widget
+ * @param user_data
+ */
 void deleteItemHandler(GtkWidget* widget, gpointer user_data){
 
     int id = -1;
@@ -163,6 +191,11 @@ void deleteItemHandler(GtkWidget* widget, gpointer user_data){
     }
 }
 
+/**
+ * Method for displaying the item editor with for a given item
+ * Sets the appropriate fields from the item
+ * @param item - Item being edited
+ */
 void openItemEditor(Item *item){
 
     char t[BUFFER_SIZE] = {0};
@@ -186,6 +219,11 @@ void openItemEditor(Item *item){
 
 }
 
+/**
+ * Signal handler for pressing the edit item button
+ * Will pull the relevant information from the table and create an Item to be edited
+ * @param user_data
+ */
 G_MODULE_EXPORT void editItemDialog(gpointer user_data){
     Item *item = (Item*)malloc(sizeof(Item));
     bzero(item->name, BUFFER_SIZE);
@@ -225,6 +263,13 @@ G_MODULE_EXPORT void editItemDialog(gpointer user_data){
     openItemEditor(item);
 }
 
+/**
+ * Signal Handler for creating a new Item
+ *
+ * Creates a new item with empty field values. an ID of -1 is used to indicate that the item is new
+ *
+ * @param data
+ */
 G_MODULE_EXPORT void newItemDialog(gpointer data){
 
     Item *item = (Item*)malloc(sizeof(Item));
@@ -242,6 +287,10 @@ G_MODULE_EXPORT void newItemDialog(gpointer data){
     openItemEditor(item);
 }
 
+/**
+ * Helper method for displaying an error message to the user
+ * @param msg
+ */
 void display_error_dialog(char* msg){
     GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(mainWindow), GTK_DIALOG_DESTROY_WITH_PARENT,
                                                GTK_MESSAGE_ERROR, GTK_BUTTONS_CLOSE, "Error %s", msg);
@@ -249,6 +298,10 @@ void display_error_dialog(char* msg){
     gtk_widget_destroy(dialog);
 }
 
+/**
+ * Method queries the database for all entities.
+ * Will wipe the tree and re-display all found entities
+ */
 void get_all_items_from_database(){
     // One extra char to guarantee null-termination
     char buffer[BUFFER_SIZE + 1] = {0};
@@ -334,6 +387,10 @@ void get_all_items_from_database(){
     gtk_tree_selection_select_iter(selection, &iter);
 }
 
+/**
+ * Loads the main UI from the UI file and binds all the relevant variables
+ * Connects all action signals.
+ */
 void create_main_ui(){
     GError *err = NULL;
 

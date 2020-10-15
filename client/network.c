@@ -1,5 +1,11 @@
 #include "network.h"
 
+/**
+ * Method responsible for connecting to a remote host on a given port
+ * @param hostname
+ * @param port
+ * @return
+ */
 int create_socket(char* hostname, unsigned int port){
     int sockfd;
     struct hostent* host;
@@ -29,6 +35,12 @@ int create_socket(char* hostname, unsigned int port){
     return sockfd;
 }
 
+/**
+ * Responsible for initializing connection to the database server
+ * @param hostname
+ * @param port
+ * @return
+ */
 int database_connect(char* hostname, int port) {
     OpenSSL_add_all_algorithms();
     if (SSL_library_init() < 0) {
@@ -64,6 +76,10 @@ int database_connect(char* hostname, int port) {
     return 1;
 }
 
+/**
+ * Disconnects and cleans up the file descriptors
+ * @return
+ */
 int disconnect(){
     SSL_free(ssl);
     SSL_CTX_free(ssl_ctx);

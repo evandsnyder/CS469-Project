@@ -65,7 +65,13 @@ static struct argp_option options[] = {
 };
 
 
-
+/**
+ * Main server method.
+ *  Reads arguments and confic file
+ *  spawns DB thread
+ *  sets up network listener
+ *  Spawns new thread for every connected client
+ */
 struct argp argp = { options, parse_args, 0, "A program to manage remote database queries."};
 int main(int argc, char *argv[]){
 
@@ -615,8 +621,9 @@ void *client_thread(void *data){
     }
 
     if(response->operation) {
-        // TODO: error handling
-        SSL_write(ssl, response->operation, strlen(response->operation));
+        if(SSL_write(ssl, response->operation, strlen(response->operation)) < 0){
+            fprintf(stderr, "SERVER: Error writing to client: %s\n", strerror(errno));
+        }
     }
 
     SSL_free(ssl);
@@ -652,6 +659,14 @@ void* timer_thread_handler(void *data){
     }
 }
 
+/**
+ * Given a username and password, this method gets the selected user's password
+ * and checks that the provided password is the same.
+ * @param db - handle to the database
+ * @param username - user attempting logon
+ * @param password - attempted login password
+ * @return
+ */
 int db_login(sqlite3 *db, char *username, char *password) {
     const char *sql = "SELECT password FROM users where username=? LIMIT 1;";
     sqlite3_stmt *stmt;
@@ -691,6 +706,13 @@ int authenticate(const char *hash, char *password){
     return strncmp(hash, crypt(password, salt), BUFFER_SIZE);
 }
 
+/**
+ * Parses command line arguments
+ * @param key
+ * @param arg
+ * @param state
+ * @return
+ */
 static error_t parse_args(int key, char *arg, struct argp_state *state){
     struct Arguments *arguments = state->input;
     char *pEnd;
@@ -847,7 +869,11 @@ int parse_interval(char* interval){
     return num * mult;
 }
 
-
+/**
+ * Marshalls all items from a GET ALL request directly into a serialized message
+ * @param stmt
+ * @return
+ */
 char * marshalItems(sqlite3_stmt *stmt){
     size_t cur_size =1024*4;
     size_t mem_size = 1024*4;
@@ -890,10 +916,14 @@ char * marshalItems(sqlite3_stmt *stmt){
     return result;
 }
 
+/**
+ * Given a SQLITE_ROW, convert all relevant fields into an Item struct
+ * @param stmt
+ * @param item
+ */
 void new_item_from_row(sqlite3_stmt * stmt, Item * item) {
     item->id = sqlite3_column_int(stmt, 0);
     snprintf(item->name, BUFFER_SIZE, "%s", (const char*)sqlite3_column_text(stmt, 1));
-    // item->name = strdup((const char*)sqlite3_column_text(stmt, 1));
     item->armor = sqlite3_column_int(stmt, 2);
     item->health = sqlite3_column_int(stmt, 3);
     item->mana = sqlite3_column_int(stmt, 4); // mana
@@ -902,5 +932,4 @@ void new_item_from_row(sqlite3_stmt * stmt, Item * item) {
     item->critChance = sqlite3_column_double(stmt, 7);
     item->range = sqlite3_column_int(stmt, 8); // range
     snprintf(item->description, BUFFER_SIZE, "%s", (const char*)sqlite3_column_text(stmt, 9));
-    // item->description = strdup((const char*)sqlite3_column_text(stmt, 9));
 }

@@ -21,6 +21,13 @@ static struct argp_option options[] = {
         {0}
 };
 
+/**
+ * Parses command line arguments into their respective fields
+ * @param key
+ * @param arg
+ * @param state
+ * @return
+ */
 static error_t parse_args(int key, char *arg, struct argp_state *state){
     struct Arguments *arguments = state->input;
     char *pEnd;
@@ -162,6 +169,11 @@ int main(int argc, char *argv[]){
     return 0;
 }
 
+/**
+ * Handles tearing down the connection
+ * @param ssl
+ * @param clientFd
+ */
 void cleanup_connection(SSL * ssl, int clientFd) {
     if (ssl)
         SSL_free(ssl);
@@ -176,6 +188,11 @@ char secure_compare(char * bufa, char * bufb, size_t len) {
     return ret;
 }
 
+/**
+ * Parses a given config file for relevant arguments
+ * @param args
+ * @return
+ */
 int parse_conf_file(void *args){
     struct Arguments *arguments = (struct Arguments *)args;
     char field[BUFFER_SIZE];

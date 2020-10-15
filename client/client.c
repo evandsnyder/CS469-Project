@@ -1,9 +1,13 @@
-#include <stdio.h>
-
-#include "../globals.h"
 #include "login_window.h"
-#include "network.h"
 
+/**
+ * Entry point for the program. Initializes GTK and starts
+ * the login sequence.
+ *
+ * @param argc
+ * @param argv
+ * @return
+ */
 int main(int argc, char** argv){
 
     gtk_init(&argc, &argv);

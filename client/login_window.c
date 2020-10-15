@@ -1,7 +1,3 @@
-//
-// Created by arch1t3ct on 9/23/20.
-//
-
 #include "login_window.h"
 #include "../globals.h"
 
@@ -15,14 +11,14 @@ char usernameBuffer[BUFFER_SIZE];
 char passwordBuffer[BUFFER_SIZE];
 char serverAddress[BUFFER_SIZE];
 
+/**
+ * Handles connecting to the server and validating the login
+ * with the server
+ * @param widget
+ * @param arg
+ */
+
 G_MODULE_EXPORT void login(GtkWidget *widget, gpointer arg){
-    // validate address
-    // connect
-    // authenticate
-    // if success
-    //    close this, open main, pass network socket
-    // else
-    //    error message
     unsigned int port = DEFAULT_SERVER_PORT;
 
     getUsernameText();
@@ -80,6 +76,10 @@ G_MODULE_EXPORT void login(GtkWidget *widget, gpointer arg){
     gtk_window_close(GTK_WINDOW(loginWindow));
 }
 
+/**
+ * create_login_io() reads the UI file and builds the interface with a builder object
+ * It also connects all necessary signals and displays the window.
+ */
 void create_login_ui(){
     GtkBuilder *builder;
     GError *err = NULL;
@@ -108,22 +108,37 @@ void create_login_ui(){
     gtk_widget_show(loginWindow);
 }
 
+/**
+ * Helper method for getting the text stored in the username entry field
+ * @return
+ */
 char* getUsernameText(){
     strncpy(usernameBuffer, gtk_entry_get_text(GTK_ENTRY(usernameBox)), BUFFER_SIZE);
     return usernameBuffer;
 }
 
+/**
+ * Helper method for getting the text stored in the password entry field
+ * @return
+ */
 char* getPasswordText(){
     strncpy(passwordBuffer, gtk_entry_get_text(GTK_ENTRY(passwordBox)), BUFFER_SIZE);
     return passwordBuffer;
 }
 
+/**
+ * Reset all o the text fields to their default values
+ */
 G_MODULE_EXPORT void clearText(){
     gtk_entry_set_text(GTK_ENTRY(usernameBox), "");
     gtk_entry_set_text(GTK_ENTRY(passwordBox), "");
     gtk_entry_set_text(GTK_ENTRY(serverBox), "localhost:4466");
 }
 
+/**
+ * Helper method to get the server address from the text entry box
+ * @return
+ */
 char* getServerAddressText(){
     strncpy(serverAddress, gtk_entry_get_text(GTK_ENTRY(serverBox)), BUFFER_SIZE);
     return serverAddress;

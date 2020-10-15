@@ -74,6 +74,27 @@ Finally, the client application can be run:
 ./clientApp
 ```
 
+#### Usage
+Once installation has been completed, the datastore backup server should be started first:
+```
+./datastore # RAN WITH DEFAULT ARGS
+```
+
+Then, we can run the server itself:
+```
+./server # ALSO USING DEFAULT ARGS
+```
+
+Lastly, the client can be launch:
+```
+./client
+```
+
+These can all be on different machines or the same machine provided that the datastore and the main server are not
+configured to listen on the same port.
+
+Once the client is launched, you will be greeted with the login screen:
+
 #### TODO:
 * ~~Client Login UI~~
 * ~~Client Main UI~~

@@ -18,11 +18,15 @@ void *malloc_aligned(unsigned int size){
 }
 
 void freeItem(Item* item){
-//    free(item->description);
-//    free(item->name);
     free(item);
 }
 
+/**
+ * Convert a given item into a serialized string for network transmission
+ * @param item
+ * @param result
+ * @return
+ */
 char* serialize_item(Item *item, char* result){
     asprintf(&result, "%d\n%s\n%d\n%d\n%d\n%d\n%d\n%f\n%d\n%s%c",
              item->id, // id
@@ -39,10 +43,13 @@ char* serialize_item(Item *item, char* result){
     return result;
 }
 
+/**
+ * Convert a string to an Item struct
+ * @param buf
+ * @param item
+ */
 void deserialize_item(char *buf, Item *item) {
-    // item->name = malloc(sizeof(char) * 256);
     bzero(item->name, BUFFER_SIZE);
-    // item->description = malloc(sizeof(char)*256);
     bzero(item->description, BUFFER_SIZE);
 
     sscanf(buf, "%d\n%[^\n]\n%d\n%d\n%d\n%d\n%d\n%lf\n%d\n%[^\x1e]",
