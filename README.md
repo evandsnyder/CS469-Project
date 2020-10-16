@@ -87,13 +87,36 @@ Then, we can run the server itself:
 
 Lastly, the client can be launch:
 ```
-./client
+./clientApp
 ```
+
 
 These can all be on different machines or the same machine provided that the datastore and the main server are not
 configured to listen on the same port.
 
 Once the client is launched, you will be greeted with the login screen:
+
+![LOGIN_SCREEN](login_screenshot.png)
+
+Enter the username and password used in the user manager tool to log into the application. If the credentials
+are incorrect, or the specified server is unreachable, an appropriate error message will be displayed.
+
+After logging in, the main window will appear, populated with the items in the database:
+
+![MAIN_WINDOW](main_window_scrot.png)
+
+At this point, you can `Create`, `Edit`, or `Delete` items in the database. Creating or editing an item will bring up
+the item editor dialog with the appropriate fields loaded:
+
+![ITEM_EDITOR](edit_item_scrot.png)
+
+After successfully creating or editing the item, data will be reloaded from the database to reflect the new changes
+
+When deleting an item, a confirmation dialog will appear asking to validate the delete action:
+
+![DELETE_ITEM](delete_item_scrot.png)
+
+Once operations are done, simply close the application to terminate the connection.
 
 #### TODO:
 * ~~Client Login UI~~
