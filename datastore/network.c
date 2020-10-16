@@ -1,3 +1,6 @@
+/**
+ * Documentation for the below functions is available in "network.h"
+ */
 #include "network.h"
 
 int create_socket(unsigned int port){

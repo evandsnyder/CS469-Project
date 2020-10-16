@@ -9,6 +9,9 @@ char secure_compare(char * bufa, char * bufb, size_t len);
 void cleanup_connection(SSL * ssl, int clientFd);
 int parse_conf_file(void *args);
 
+/**
+ * Configure the allowable arguments
+ */
 struct Arguments {
     int listenPort;
     char *psk;
@@ -23,8 +26,8 @@ static struct argp_option options[] = {
 
 /**
  * Parses command line arguments into their respective fields
- * @param key
- * @param arg
+ * @param key The key of the arg to parse
+ * @param arg The argument data
  * @param state
  * @return
  */
@@ -50,6 +53,14 @@ static error_t parse_args(int key, char *arg, struct argp_state *state){
 }
 
 struct argp argp = { options, parse_args, 0, "A program to manage remote database queries."};
+
+/**
+ * Main datastore method.
+ * * Read in arguments and config file
+ * * Set up listening socket
+ * * Authenticate incoming requests
+ * * Save backup data to disk
+ */
 int main(int argc, char *argv[]){
     struct Arguments arguments = {0};
     arguments.listenPort = DEFAULT_BACKUP_PORT;
@@ -110,7 +121,7 @@ int main(int argc, char *argv[]){
         char buffer[BUFFER_SIZE];
         int rcount;
         rcount = SSL_read(ssl, buffer, BUFFER_SIZE);
-        if (rcount < strlen(command) || !secure_compare(buffer, command, strlen(command))) {
+        if (rcount < strlen(command) || CRYPTO_memcmp(buffer, command, strlen(command))) {
             fprintf(stderr, "Unknown command\n");
             cleanup_connection(ssl, clientFd);
             continue;
@@ -170,9 +181,11 @@ int main(int argc, char *argv[]){
 }
 
 /**
- * Handles tearing down the connection
- * @param ssl
- * @param clientFd
+ * Handles tearing down the connection. Frees the SSL and the fd associated with
+ * the connection.
+ *
+ * @param ssl The SSL* to free
+ * @param clientFd The POSIX socket to close
  */
 void cleanup_connection(SSL * ssl, int clientFd) {
     if (ssl)
@@ -180,18 +193,12 @@ void cleanup_connection(SSL * ssl, int clientFd) {
     close(clientFd);
 }
 
-char secure_compare(char * bufa, char * bufb, size_t len) {
-    char ret = 1;
-    for(int i=0; i<len; ++i)
-        if (bufa[i] != bufb[i])
-            ret = 0;
-    return ret;
-}
-
 /**
- * Parses a given config file for relevant arguments
- * @param args
- * @return
+ * Parses a given config file for relevant arguments. 
+ *
+ * @param args Arguments* containing the config file to be read, and which will
+ *             be filled with the updated configuration.
+ * @return 0 on success, or -1 on failure.
  */
 int parse_conf_file(void *args){
     struct Arguments *arguments = (struct Arguments *)args;
