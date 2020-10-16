@@ -397,8 +397,6 @@ void *handle_database_thread(void *data){
 
                 // NOTE: this doesn't loop. We use it for an early-return on error
                 while (1) {
-                    // TODO: errno, etc
-
                     // Close database handle.
                     sqlite3_close(db);
 
@@ -408,7 +406,7 @@ void *handle_database_thread(void *data){
                     // Open connection to remote server
                     backupSockFd = create_client_socket(info->backupServer, info->backupPort);
                     if (backupSockFd < 0) {
-                        fprintf(stderr, "Error reopening database file for sync\n");
+                        // error message has already been displayed
                         success = 0;
                         break;
                     }
@@ -423,7 +421,7 @@ void *handle_database_thread(void *data){
                     // Open as standard file,
                     dbFileFd = open(info->database, O_RDONLY);
                     if (dbFileFd < 0) {
-                        fprintf(stderr, "Error reopening database file for sync\n");
+                        fprintf(stderr, "Error reopening database file for sync: %s\n", strerror(errno));
                         success = 0;
                         break;
                     }
@@ -439,6 +437,7 @@ void *handle_database_thread(void *data){
                         rcount = SSL_write(ssl, buffer, rcount);
                         if (rcount < 0) {
                             fprintf(stderr, "Error writing to socket\n");
+                            ERR_print_errors_fp(stderr);
                             success = 0;
                             break;
                         }
@@ -447,11 +446,19 @@ void *handle_database_thread(void *data){
                         break;
                     SSL_shutdown(ssl);
                     // get success response back
-                    while (SSL_read(ssl, buffer, BUFFER_SIZE) > 0)
+                    while ((rcount = SSL_read(ssl, buffer, BUFFER_SIZE)) > 0)
                         ;
 
-                    if (strncmp(buffer, "SUCCESS", strlen("SUCCESS")) != 0)
+                    if (rcount < 0) {
+                        fprintf(stderr, "Error reading from socket\n");
+                        ERR_print_errors_fp(stderr);
                         success = 0;
+                    }
+
+                    if (strncmp(buffer, "SUCCESS", strlen("SUCCESS")) != 0) {
+                        fprintf(stderr, "Non-success response received from server\n");
+                        success = 0;
+                    }
 
                     break;
                 }

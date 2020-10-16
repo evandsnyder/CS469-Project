@@ -34,13 +34,13 @@ int create_client_socket(char* hostname, unsigned int port){
 
     host = gethostbyname(hostname);
     if(host == NULL){
-        fprintf(stderr, "Could not obtain hostname\n");
+        fprintf(stderr, "Could not obtain hostname: %s\n", strerror(errno));
         return -1;
     }
 
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if(sockfd < 0){
-        fprintf(stderr, "Could not create socket\n");
+        fprintf(stderr, "Could not create socket: %s\n", strerror(errno));
         return -1;
     }
 

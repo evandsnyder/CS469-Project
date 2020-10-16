@@ -88,11 +88,10 @@ int main(int argc, char *argv[]){
     sprintf(command, "REPLICATE %s\n", arguments.psk);
 
     while (1) {
-        // TODO: errno, etc
         // accept the client
         int clientFd = accept(serverFd, NULL, NULL);
         if (clientFd < 0) {
-            fprintf(stderr, "Could not create client socket\n");
+            fprintf(stderr, "Could not create client socket: %s\n", strerror(errno));
             continue;
         }
 
@@ -102,11 +101,13 @@ int main(int argc, char *argv[]){
         SSL * ssl = SSL_new(ssl_ctx);
         if (!ssl) {
             fprintf(stderr, "Could not create SSL*\n");
+            ERR_print_errors_fp(stderr);
             cleanup_connection(NULL, clientFd);
             continue;
         }
         if (SSL_set_fd(ssl, clientFd) < 0) {
             fprintf(stderr, "Could not set fd\n");
+            ERR_print_errors_fp(stderr);
             cleanup_connection(ssl, clientFd);
             continue;
         }
@@ -122,14 +123,14 @@ int main(int argc, char *argv[]){
         int rcount;
         rcount = SSL_read(ssl, buffer, BUFFER_SIZE);
         if (rcount < strlen(command) || CRYPTO_memcmp(buffer, command, strlen(command))) {
-            fprintf(stderr, "Unknown command\n");
+            fprintf(stderr, "Unknown command. Did you set the key correctly?\n");
             cleanup_connection(ssl, clientFd);
             continue;
         }
 
         int fileFd = open("items.bk.db", O_WRONLY | O_CREAT, 0666);
         if (fileFd < 0) {
-            fprintf(stderr, "Unable to open output file\n");
+            fprintf(stderr, "Unable to open output file: %s\n", strerror(errno));
             cleanup_connection(ssl, clientFd);
             continue;
         }
@@ -137,7 +138,7 @@ int main(int argc, char *argv[]){
         if (rcount > strlen(command)) {
             rcount = write(fileFd, buffer + strlen(command), rcount - strlen(command));
             if (rcount < 0) {
-                fprintf(stderr, "Unable to write to output file\n");
+                fprintf(stderr, "Unable to write to output file: %s\n", strerror(errno));
                 close(fileFd);
                 cleanup_connection(ssl, clientFd);
                 continue;
@@ -164,6 +165,7 @@ int main(int argc, char *argv[]){
         rcount = SSL_write(ssl, "SUCCESS", strlen("SUCCESS"));
         if (rcount <= 0) {
             fprintf(stderr, "Unable to send success message\n");
+            ERR_print_errors_fp(stderr);
             cleanup_connection(ssl, clientFd);
             continue;
         }
